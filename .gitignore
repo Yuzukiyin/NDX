@@ -1,0 +1,8 @@
+__pycache__
+.vscode
+venv
+
+fund.db
+transactions.csv
+transactions_old.csv
+auto_invest_setting.json
