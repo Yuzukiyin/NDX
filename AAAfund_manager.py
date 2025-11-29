@@ -19,10 +19,10 @@ def main():
         fetcher.import_enabled_plans()
         print("历史净值抓取完成，已写入 fund_nav_history 表")
 
-    # if input("导入历史交易？([y]/n): ").strip().lower() != 'n':
-    #     importer = TransactionImporter(db_path='fund.db')
-    #     importer.import_from_csv()
-    #     print("历史交易导入完成，已写入 transactions 表")
+    if input("导入历史交易？([y]/n): ").strip().lower() != 'n':
+        importer = TransactionImporter(db_path='fund.db')
+        importer.import_from_csv()
+        print("历史交易导入完成，已写入 transactions 表")
 
     if input("根据定投计划导入定投交易？([y]/n): ").strip().lower() != 'n':
         importer = ImportAutoInvest(config_file='auto_invest_setting.json', db_path='fund.db')
