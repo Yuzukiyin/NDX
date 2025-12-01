@@ -35,14 +35,27 @@ async def init_db():
     from ..models.user import Base
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Ensure fund tables exist in the same SQLite file
+        # Ensure fund tables exist (compatible with both SQLite and PostgreSQL)
         try:
-            # Detect if fund_overview exists; if not, apply schema
-            res = await conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='fund_overview'")
+            # Check if using PostgreSQL or SQLite
+            db_url = settings.database_url_async.lower()
+            if 'postgresql' in db_url:
+                # PostgreSQL: check information_schema
+                res = await conn.exec_driver_sql(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = 'public' AND table_name = 'fund_overview'"
+                )
+            else:
+                # SQLite: check sqlite_master
+                res = await conn.exec_driver_sql(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='fund_overview'"
+                )
+            
             if res.fetchone() is None:
                 schema_path = Path(__file__).parent.parent / 'db' / 'fund_multitenant.sql'
                 sql = schema_path.read_text(encoding='utf-8')
                 await conn.exec_driver_sql(sql)
+                print("✅ Fund schema initialized")
         except Exception as e:
             # Log and continue. FundService can also initialize on demand if needed.
             print(f"⚠️ Fund schema init skipped: {e}")
