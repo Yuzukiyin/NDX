@@ -37,8 +37,12 @@ class Settings(BaseSettings):
     def database_url_async(self) -> str:
         """Ensure DATABASE_URL uses async driver"""
         url = self.DATABASE_URL
+        # Convert SQLite to async
         if url.startswith("sqlite:///") and "+aiosqlite" not in url:
             url = url.replace("sqlite:///", "sqlite+aiosqlite:///")
+        # Convert PostgreSQL to async (asyncpg)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
     
     # CORS
