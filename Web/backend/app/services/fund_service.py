@@ -24,10 +24,6 @@ class FundService:
             # 其他用户使用独立数据库
             self.db_path = f"./user_data/user_{user_id}_fund.db"
             Path("./user_data").mkdir(exist_ok=True)
-        
-        # 检查是否使用 PostgreSQL（通过环境变量）
-        import os
-        self.use_postgres = os.getenv("DATABASE_URL", "").startswith("postgres")
     
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection"""

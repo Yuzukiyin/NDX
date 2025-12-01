@@ -24,20 +24,6 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./ndx_users.db"
     FUND_DB_PATH: str = "../../../fund.db"  # Original fund database
     
-    # PostgreSQL support (Render uses DATABASE_URL env var)
-    # If DATABASE_URL starts with postgres://, it's PostgreSQL
-    @property
-    def is_postgres(self) -> bool:
-        return self.DATABASE_URL.startswith("postgres")
-    
-    @property
-    def async_database_url(self) -> str:
-        """Get async database URL"""
-        if self.is_postgres:
-            # Replace postgres:// with postgresql+asyncpg://
-            return self.DATABASE_URL.replace("postgres://", "postgresql+asyncpg://")
-        return self.DATABASE_URL
-    
     # CORS
     CORS_ORIGINS: list = [
         "http://localhost:3000",
