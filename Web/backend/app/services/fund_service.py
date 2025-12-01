@@ -156,13 +156,12 @@ class FundService:
             
             fetcher = HistoryNavFetcher(
                 config_path=str(config_path) if config_path.exists() else 'auto_invest_setting.json',
-                db_path=self.db_path
+                db_path=self.db_path,
+                user_id=self.user_id  # 添加user_id支持
             )
-            if fund_codes:
-                for code in fund_codes:
-                    fetcher.fetch_and_save(code)
-            else:
-                fetcher.import_enabled_plans()
+            
+            # 调用正确的方法
+            fetcher.import_enabled_plans()
         except ImportError as e:
             raise Exception(f"无法导入历史净值模块: {e}")
         except Exception as e:
@@ -186,7 +185,8 @@ class FundService:
             
             updater = PendingTransactionUpdater(
                 db_path=self.db_path,
-                config_file=str(config_path) if config_path.exists() else 'auto_invest_setting.json'
+                config_file=str(config_path) if config_path.exists() else 'auto_invest_setting.json',
+                user_id=self.user_id  # 添加user_id
             )
             updater.process_pending_records()
         except ImportError as e:

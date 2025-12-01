@@ -12,12 +12,13 @@ from import_transactions import TransactionImporter
 from tradeDate import TradeDateChecker
 
 class PendingTransactionUpdater:
-    def __init__(self, db_path='fund.db', config_file='auto_invest_setting.json'):
+    def __init__(self, db_path='fund.db', config_file='auto_invest_setting.json', user_id=1):
         self.db_path = db_path
         self.config_file = config_file
+        self.user_id = user_id
         self.checker = TradeDateChecker(config_file=config_file, db_path=db_path)
         self.plans = self._build_plan_map()
-        self.importer = TransactionImporter(db_path=db_path)
+        self.importer = TransactionImporter(db_path=db_path, user_id=user_id)
     
     def _build_plan_map(self):
         """从 TradeDateChecker 加载的计划构建 fund_code -> amount 映射"""

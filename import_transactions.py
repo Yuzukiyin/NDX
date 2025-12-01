@@ -12,10 +12,11 @@ from typing import Optional, Tuple
 from tradeDate import TradeDateChecker
 
 class TransactionImporter:
-    def __init__(self, db_path: str = 'fund.db',csv_file='transactions.csv'):
+    def __init__(self, db_path: str = 'fund.db',csv_file='transactions.csv', user_id=1):
         '''设置默认数据库路径和CSV文件路径'''
         self.db_path = db_path
         self.csv_file = csv_file
+        self.user_id = user_id
 
     def add_transaction(self, 
                        fund_code: str,
@@ -225,9 +226,9 @@ class TransactionImporter:
         cursor = conn.cursor()
         cursor.execute(
             """SELECT fund_name, unit_nav FROM fund_nav_history 
-                WHERE fund_code=? AND price_date=? 
+                WHERE user_id=? AND fund_code=? AND price_date=? 
                 ORDER BY fetched_at DESC LIMIT 1""",
-            (fund_code, transaction_date)
+            (self.user_id, fund_code, transaction_date)
         )
         row = cursor.fetchone()
         conn.close()

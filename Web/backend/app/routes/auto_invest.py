@@ -158,9 +158,14 @@ async def execute_today_plans(
         else:
             db_path = "./ndx_users.db"
         
+        print(f"[DEBUG] 数据库路径: {db_path}")
+        print(f"[DEBUG] 用户ID: {service.user_id}")
+        
         # Get all enabled plans from database
         enabled_plans = service.get_all_plans()
         enabled_plans = [p for p in enabled_plans if p.enabled]
+        
+        print(f"[DEBUG] 启用的计划数: {len(enabled_plans)}")
         
         if not enabled_plans:
             return {"message": "没有启用的定投计划", "transactions_created": 0}
@@ -173,11 +178,14 @@ async def execute_today_plans(
         cur = conn.cursor()
         
         for plan in enabled_plans:
+            print(f"[DEBUG] 处理计划: {plan.plan_name}")
+            
             # Check if plan should execute today based on frequency
             start_date = datetime.strptime(plan.start_date, '%Y-%m-%d')
             end_date = datetime.strptime(plan.end_date, '%Y-%m-%d')
             
             if not (start_date <= today_dt <= end_date):
+                print(f"[DEBUG] 跳过: 不在日期范围内")
                 continue
             
             should_execute = False
@@ -187,6 +195,8 @@ async def execute_today_plans(
                 should_execute = (today_dt.weekday() == start_date.weekday())
             elif plan.frequency == 'monthly':
                 should_execute = (today_dt.day == start_date.day)
+            
+            print(f"[DEBUG] 是否应执行: {should_execute}")
             
             if should_execute:
                 # Calculate T+1 confirm date (next weekday)
@@ -201,7 +211,11 @@ async def execute_today_plans(
                     WHERE user_id = ? AND fund_code = ? AND transaction_date = ?
                 """, (service.user_id, plan.fund_code, today))
                 
-                if cur.fetchone()[0] == 0:
+                exists = cur.fetchone()[0]
+                print(f"[DEBUG] 交易记录已存在: {exists > 0}")
+                
+                if exists == 0:
+                    print(f"[DEBUG] 插入交易记录: {plan.fund_code}, 金额: {plan.amount}")
                     cur.execute("""
                         INSERT INTO transactions (
                             user_id, fund_code, fund_name, transaction_date, 
@@ -218,8 +232,10 @@ async def execute_today_plans(
                         f"[待确认] {plan.plan_name}"
                     ))
                     transactions_created += 1
+                    print(f"[DEBUG] 成功创建交易记录")
         
         conn.commit()
+        print(f"[DEBUG] 提交事务,共创建 {transactions_created} 条记录")
         conn.close()
         
         return {
@@ -229,7 +245,10 @@ async def execute_today_plans(
         }
         
     except Exception as e:
+        import traceback
+        error_detail = f"执行定投计划失败: {str(e)}\n{traceback.format_exc()}"
+        print(f"[ERROR] {error_detail}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"执行定投计划失败: {str(e)}"
+            detail=error_detail
         )

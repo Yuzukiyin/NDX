@@ -11,11 +11,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'fundSpider'))
 from fundSpider.fund_info import FuncInfo
 
 class HistoryNavFetcher:
-    def __init__(self, config_path='auto_invest_setting.json', db_path='fund.db', data_source='fundSpider'):
+    def __init__(self, config_path='auto_invest_setting.json', db_path='fund.db', data_source='fundSpider', user_id=1):
         '''设置默认输出目录和配置文件路径'''
         self.config_path = config_path
         self.db_path = db_path
         self.data_source = data_source
+        self.user_id = user_id  # 添加user_id支持多租户
 
     def load_enabled_plans(self):
         """读取启用定投计划并返回列表字典
@@ -115,8 +116,8 @@ class HistoryNavFetcher:
         cur = conn.cursor()
         cur.execute("""
             SELECT COUNT(*) FROM fund_nav_history
-            WHERE fund_code = ? AND price_date = ? AND data_source = ?
-        """, (fund_code, price_date, self.data_source))
+            WHERE user_id = ? AND fund_code = ? AND price_date = ? AND data_source = ?
+        """, (self.user_id, fund_code, price_date, self.data_source))
         count = cur.fetchone()[0]
         conn.close()
         return count > 0
@@ -133,8 +134,8 @@ class HistoryNavFetcher:
         cur = conn.cursor()
         cur.execute("""
             SELECT MAX(price_date) FROM fund_nav_history
-            WHERE fund_code = ? AND data_source = ?
-        """, (fund_code, self.data_source))
+            WHERE user_id = ? AND fund_code = ? AND data_source = ?
+        """, (self.user_id, fund_code, self.data_source))
         row = cur.fetchone()
         conn.close()
         latest = row[0] if row and row[0] else None
@@ -183,7 +184,7 @@ class HistoryNavFetcher:
                     cumulative_nav_f = float(cumulative_nav)
             except Exception:
                 cumulative_nav_f = None
-            records.append((fund_code, fund_name, price_date, unit_nav_f, cumulative_nav_f, daily_growth_rate,
+            records.append((self.user_id, fund_code, fund_name, price_date, unit_nav_f, cumulative_nav_f, daily_growth_rate,
                              self.data_source))
         if skipped_count > 0:
             print(f"跳过已存在的 {skipped_count} 条记录")
@@ -197,6 +198,7 @@ class HistoryNavFetcher:
         cur.execute("""
         CREATE TABLE IF NOT EXISTS fund_nav_history (
             nav_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
             fund_code TEXT NOT NULL,
             fund_name TEXT NOT NULL,
             price_date TEXT NOT NULL,
@@ -205,14 +207,14 @@ class HistoryNavFetcher:
             daily_growth_rate REAL,
             data_source TEXT DEFAULT 'fundSpider',
             fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(fund_code, price_date, data_source)
+            UNIQUE(user_id, fund_code, price_date, data_source)
         );
         """)
         sql = """
         INSERT INTO fund_nav_history (
-            fund_code,fund_name,price_date,unit_nav,cumulative_nav,daily_growth_rate,
+            user_id,fund_code,fund_name,price_date,unit_nav,cumulative_nav,daily_growth_rate,
             data_source
-        ) VALUES (?,?,?,?,?,?,?)
+        ) VALUES (?,?,?,?,?,?,?,?)
         ON CONFLICT(fund_code, price_date, data_source) DO UPDATE SET
             unit_nav=excluded.unit_nav,
             cumulative_nav=excluded.cumulative_nav,
