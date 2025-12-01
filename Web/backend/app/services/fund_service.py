@@ -17,9 +17,13 @@ class FundService:
     def __init__(self, user_id: int):
         """Initialize with user-specific database"""
         self.user_id = user_id
-        # Each user has their own fund database
-        self.db_path = f"./user_data/user_{user_id}_fund.db"
-        Path("./user_data").mkdir(exist_ok=True)
+        # 特殊处理: ID为1的用户使用已有的fund.db
+        if user_id == 1:
+            self.db_path = "../../../fund.db"
+        else:
+            # 其他用户使用独立数据库
+            self.db_path = f"./user_data/user_{user_id}_fund.db"
+            Path("./user_data").mkdir(exist_ok=True)
     
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection"""

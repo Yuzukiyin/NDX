@@ -30,6 +30,7 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
+        "https://*.vercel.app",  # Vercel部署域名
     ]
     
     # Email (optional, for verification)

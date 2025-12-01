@@ -1,0 +1,44 @@
+"""一键启动脚本 - 创建管理员账户并启动服务"""
+import asyncio
+import subprocess
+import sys
+from pathlib import Path
+
+async def main():
+    """主函数"""
+    print("=" * 60)
+    print("🚀 NDX基金管理系统 - 启动脚本")
+    print("=" * 60)
+    
+    # 1. 创建管理员账户
+    print("\n📝 步骤1: 初始化管理员账户...")
+    from init_admin import create_admin_user
+    await create_admin_user()
+    
+    # 2. 启动服务
+    print("\n🌐 步骤2: 启动后端服务...")
+    print("   访问地址: http://localhost:8000")
+    print("   API文档: http://localhost:8000/docs")
+    print("\n   管理员账户:")
+    print("   邮箱: 1712008344@qq.com")
+    print("   密码: Lzy171200")
+    print("\n" + "=" * 60)
+    print("按 Ctrl+C 停止服务")
+    print("=" * 60 + "\n")
+    
+    # 启动uvicorn
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n\n👋 服务已停止")
+        sys.exit(0)
