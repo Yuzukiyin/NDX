@@ -20,9 +20,12 @@ class Settings(BaseSettings):
     # Password requirements
     PASSWORD_MIN_LENGTH: int = 8
     
-    # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./ndx_users.db"
-    FUND_DB_PATH: str = "../../../fund.db"  # Original fund database
+    # Database - use /app/data for Railway Volume persistence
+    DATABASE_URL: str = "sqlite+aiosqlite:////app/data/ndx_users.db"
+    FUND_DB_PATH: str = "/app/data/fund.db"  # Original fund database (deprecated)
+    
+    # Auto invest config file path
+    AUTO_INVEST_CONFIG_PATH: str = "/app/data/auto_invest_setting.json"
 
     # Admin bootstrap (optional)
     # If provided, the app will auto-create this admin on first start
@@ -58,6 +61,20 @@ class Settings(BaseSettings):
     MAIL_SERVER: Optional[str] = None
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
+    
+    @property
+    def auto_invest_config_resolved(self) -> str:
+        """Get auto invest config path with fallback"""
+        import os
+        # Try Railway volume path first
+        if os.path.exists(self.AUTO_INVEST_CONFIG_PATH):
+            return self.AUTO_INVEST_CONFIG_PATH
+        # Fall back to local file
+        local_path = os.path.join(os.path.dirname(__file__), '..', 'auto_invest_setting.json')
+        if os.path.exists(local_path):
+            return local_path
+        # Return default empty path
+        return self.AUTO_INVEST_CONFIG_PATH
     
     class Config:
         env_file = ".env"

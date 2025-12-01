@@ -156,12 +156,11 @@ class FundService:
             
             from fetch_history_nav import HistoryNavFetcher
             
-            # 找到配置文件路径
-            backend_root = Path(__file__).parent.parent.parent
-            config_path = backend_root / 'auto_invest_setting.json'
+            # 使用settings中的配置文件路径
+            config_path = settings.auto_invest_config_resolved
             
             fetcher = HistoryNavFetcher(
-                config_path=str(config_path) if config_path.exists() else 'auto_invest_setting.json',
+                config_path=config_path,
                 db_path=self.db_path
             )
             
@@ -190,13 +189,12 @@ class FundService:
             
             from update_pending_transactions import PendingTransactionUpdater
             
-            # 找到配置文件路径
-            backend_root = Path(__file__).parent.parent.parent
-            config_path = backend_root / 'auto_invest_setting.json'
+            # 使用settings中的配置文件路径
+            config_path = settings.auto_invest_config_resolved
             
             updater = PendingTransactionUpdater(
                 db_path=self.db_path,
-                config_file=str(config_path) if config_path.exists() else 'auto_invest_setting.json',
+                config_file=config_path,
                 user_id=self.user_id
             )
             updater.process_pending_records()
