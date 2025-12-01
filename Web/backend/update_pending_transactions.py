@@ -31,15 +31,15 @@ class PendingTransactionUpdater:
         return plan_map
     
     def get_pending_transactions(self):
-        """查询所有待确认的交易记录（shares IS NULL）"""
+        """查询当前用户所有待确认的交易记录（shares IS NULL）"""
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
         cur.execute("""
             SELECT transaction_id, fund_code, fund_name, transaction_date, nav_date, note
             FROM transactions
-            WHERE shares IS NULL
+            WHERE user_id = ? AND shares IS NULL
             ORDER BY transaction_date, transaction_id
-        """)
+        """, (self.user_id,))
         rows = cur.fetchall()
         conn.close()
         return rows
@@ -86,13 +86,13 @@ class PendingTransactionUpdater:
         conn = sqlite3.connect(self.db_path)
         cur = conn.cursor()
         
-        # 获取所有待确认记录的不同nav_date
+        # 获取当前用户所有待确认记录的不同nav_date
         cur.execute("""
             SELECT DISTINCT nav_date
             FROM transactions
-            WHERE shares IS NULL
+            WHERE user_id = ? AND shares IS NULL
             ORDER BY nav_date
-        """)
+        """, (self.user_id,))
         
         pending_dates = [row[0] for row in cur.fetchall()]
         
@@ -113,8 +113,8 @@ class PendingTransactionUpdater:
             cur.execute("""
                 SELECT DISTINCT fund_code
                 FROM transactions
-                WHERE nav_date = ? AND shares IS NULL
-            """, (check_date,))
+                WHERE user_id = ? AND nav_date = ? AND shares IS NULL
+            """, (self.user_id, check_date))
             
             affected_funds = [row[0] for row in cur.fetchall()]
             
@@ -147,8 +147,8 @@ class PendingTransactionUpdater:
                     cur.execute("""
                         SELECT transaction_id, transaction_date, note
                         FROM transactions
-                        WHERE fund_code = ? AND nav_date = ? AND shares IS NULL
-                    """, (fund_code, check_date))
+                        WHERE user_id = ? AND fund_code = ? AND nav_date = ? AND shares IS NULL
+                    """, (self.user_id, fund_code, check_date))
                     
                     to_delete = cur.fetchall()
                     
@@ -204,7 +204,7 @@ class PendingTransactionUpdater:
                 # 从数据库读取target_amount
                 conn = sqlite3.connect(self.db_path)
                 cur = conn.cursor()
-                cur.execute("SELECT target_amount FROM transactions WHERE transaction_id = ?", (tx_id,))
+                cur.execute("SELECT target_amount FROM transactions WHERE user_id = ? AND transaction_id = ?", (self.user_id, tx_id))
                 result = cur.fetchone()
                 conn.close()
                 if not result or result[0] is None:
