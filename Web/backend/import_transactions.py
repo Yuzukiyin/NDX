@@ -218,7 +218,7 @@ class TransactionImporter:
                 print(f"{error}")
 
     def _get_nav_for_date(self, fund_code: str, transaction_date: str) -> Optional[Tuple[str, float]]:
-        """获取某基金在指定日期的 unit_nav 和 fund_name
+        """获取某基金在指定日期的 unit_nav 和 fund_name (从全局共享的历史净值表)
         严格匹配 price_date=transaction_date，不存在则返回 None
         Returns: (fund_name, unit_nav) 或 None
         """
@@ -226,9 +226,9 @@ class TransactionImporter:
         cursor = conn.cursor()
         cursor.execute(
             """SELECT fund_name, unit_nav FROM fund_nav_history 
-                WHERE user_id=? AND fund_code=? AND price_date=? 
+                WHERE fund_code=? AND price_date=? 
                 ORDER BY fetched_at DESC LIMIT 1""",
-            (self.user_id, fund_code, transaction_date)
+            (fund_code, transaction_date)
         )
         row = cursor.fetchone()
         conn.close()

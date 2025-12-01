@@ -2,8 +2,19 @@ __pycache__
 .vscode
 venv
 
+# Database files
 fund.db
+ndx_users.db
+*.db
+
+# CSV data files
 transactions.csv
 transactions_new.csv
 transactions_old.csv
+
+# Config files with sensitive data
 auto_invest_setting.json
+
+# Export files
+nav_history_export.json
+transactions_export.json

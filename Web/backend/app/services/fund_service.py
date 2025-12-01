@@ -101,12 +101,12 @@ class FundService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None
     ) -> List[NavHistory]:
-        """Get historical NAV data"""
+        """Get historical NAV data (shared globally across all users)"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        query = "SELECT price_date, unit_nav, cumulative_nav, daily_growth_rate FROM fund_nav_history WHERE user_id = ? AND fund_code = ?"
-        params = [self.user_id, fund_code]
+        query = "SELECT price_date, unit_nav, cumulative_nav, daily_growth_rate FROM fund_nav_history WHERE fund_code = ?"
+        params = [fund_code]
         
         if start_date:
             query += " AND price_date >= ?"
@@ -162,8 +162,7 @@ class FundService:
             
             fetcher = HistoryNavFetcher(
                 config_path=str(config_path) if config_path.exists() else 'auto_invest_setting.json',
-                db_path=self.db_path,
-                user_id=self.user_id
+                db_path=self.db_path
             )
             
             # 调用正确的方法
@@ -241,7 +240,7 @@ class FundService:
         conn.close()
     
     def add_nav_history_batch(self, nav_records: List[dict]):
-        """Batch add NAV history records"""
+        """Batch add NAV history records (shared globally)"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -249,16 +248,15 @@ class FundService:
             # Check if record already exists
             cursor.execute("""
                 SELECT 1 FROM fund_nav_history 
-                WHERE user_id = ? AND fund_code = ? AND price_date = ?
-            """, (self.user_id, record['fund_code'], record['price_date']))
+                WHERE fund_code = ? AND price_date = ?
+            """, (record['fund_code'], record['price_date']))
             
             if not cursor.fetchone():
                 cursor.execute("""
                     INSERT INTO fund_nav_history (
-                        user_id, fund_code, fund_name, price_date, unit_nav, fetched_at
-                    ) VALUES (?, ?, ?, ?, ?, ?)
+                        fund_code, fund_name, price_date, unit_nav, fetched_at
+                    ) VALUES (?, ?, ?, ?, ?)
                 """, (
-                    self.user_id,
                     record['fund_code'],
                     record.get('fund_name', ''),
                     record['price_date'],
