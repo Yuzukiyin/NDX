@@ -134,12 +134,11 @@ async def initialize_database(
 
 @router.post("/fetch-nav")
 async def fetch_nav(
-    fund_codes: Optional[List[str]] = None,
     fund_service: FundService = Depends(get_current_fund_service)
 ):
-    """Fetch historical NAV data"""
+    """Fetch historical NAV data for all enabled plans"""
     try:
-        fund_service.fetch_history_nav(fund_codes)
+        fund_service.fetch_history_nav(fund_codes=None)
         return {"message": "历史净值抓取完成"}
     except Exception as e:
         raise HTTPException(
