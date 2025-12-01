@@ -149,13 +149,13 @@ export default function TransactionsPage() {
                     <span
                       className={`
                         inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide
-                        ${transaction.transaction_type === 'buy'
+                        ${transaction.transaction_type === '买入'
                           ? 'bg-blue-100 text-blue-700'
                           : 'bg-orange-100 text-orange-700'
                         }
                       `}
                     >
-                      {transaction.transaction_type === 'buy' ? '买入' : '卖出'}
+                      {transaction.transaction_type === '买入' ? '买入' : '卖出'}
                     </span>
                   </div>
                   <div className="text-sm text-right font-bold text-gray-900">

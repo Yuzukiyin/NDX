@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Edit2, Trash2, Power, X } from 'lucide-react'
+import { Plus, Edit2, Trash2, Power, X, Play } from 'lucide-react'
 import Layout from '../components/Layout'
 
 interface AutoInvestPlan {
@@ -27,6 +27,7 @@ export default function AutoInvestPage() {
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingPlan, setEditingPlan] = useState<AutoInvestPlan | null>(null)
+  const [executeMessage, setExecuteMessage] = useState('')
   const [formData, setFormData] = useState({
     plan_name: '',
     fund_code: '',
@@ -146,6 +147,31 @@ export default function AutoInvestPage() {
     }
   }
 
+  const handleExecuteToday = async () => {
+    setLoading(true)
+    setExecuteMessage('正在执行今日定投...')
+    try {
+      const apiUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000'
+      const token = localStorage.getItem('access_token')
+      const response = await fetch(`${apiUrl}/auto-invest/execute-today`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setExecuteMessage(`✅ ${data.message}`)
+      } else {
+        setExecuteMessage(`❌ ${data.detail}`)
+      }
+      setTimeout(() => setExecuteMessage(''), 5000)
+    } catch (error: any) {
+      setExecuteMessage(`❌ 执行失败: ${error.message}`)
+      setTimeout(() => setExecuteMessage(''), 5000)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <Layout>
       <div className="space-y-10">
@@ -155,26 +181,43 @@ export default function AutoInvestPage() {
             <h1 className="text-5xl font-black text-gray-900 tracking-tight mb-3">定投管理</h1>
             <p className="text-gray-500 text-lg">配置和管理您的定投计划</p>
           </div>
-          <button
-            onClick={() => {
-              setEditingPlan(null)
-              setFormData({
-                plan_name: '',
-                fund_code: '',
-                fund_name: '',
-                amount: '',
-                frequency: 'daily',
-                start_date: new Date().toISOString().split('T')[0],
-                end_date: '2099-12-31'
-              })
-              setShowModal(true)
-            }}
-            className="px-6 py-3.5 bg-gray-900 text-white rounded-2xl font-bold text-sm flex items-center gap-2.5 hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl"
-          >
-            <Plus className="w-5 h-5" />
-            新增计划
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleExecuteToday}
+              disabled={loading}
+              className="px-6 py-3.5 bg-green-600 text-white rounded-2xl font-bold text-sm flex items-center gap-2.5 hover:bg-green-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+            >
+              <Play className="w-5 h-5" />
+              执行今日定投
+            </button>
+            <button
+              onClick={() => {
+                setEditingPlan(null)
+                setFormData({
+                  plan_name: '',
+                  fund_code: '',
+                  fund_name: '',
+                  amount: '',
+                  frequency: 'daily',
+                  start_date: new Date().toISOString().split('T')[0],
+                  end_date: '2099-12-31'
+                })
+                setShowModal(true)
+              }}
+              className="px-6 py-3.5 bg-gray-900 text-white rounded-2xl font-bold text-sm flex items-center gap-2.5 hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl"
+            >
+              <Plus className="w-5 h-5" />
+              新增计划
+            </button>
+          </div>
         </div>
+
+        {/* Execute Message */}
+        {executeMessage && (
+          <div className={`p-4 rounded-2xl ${executeMessage.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {executeMessage}
+          </div>
+        )}
 
         {/* Plans Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -147,14 +147,26 @@ class FundService:
     
     def fetch_history_nav(self, fund_codes: Optional[List[str]] = None):
         """Fetch historical NAV data"""
-        from fetch_history_nav import HistoryNavFetcher
-        
-        fetcher = HistoryNavFetcher(db_path=self.db_path)
-        if fund_codes:
-            for code in fund_codes:
-                fetcher.fetch_and_save(code)
-        else:
-            fetcher.import_enabled_plans()
+        try:
+            from fetch_history_nav import HistoryNavFetcher
+            
+            # 找到配置文件路径
+            root_dir = Path(__file__).parent.parent.parent.parent
+            config_path = root_dir / 'auto_invest_setting.json'
+            
+            fetcher = HistoryNavFetcher(
+                config_path=str(config_path) if config_path.exists() else 'auto_invest_setting.json',
+                db_path=self.db_path
+            )
+            if fund_codes:
+                for code in fund_codes:
+                    fetcher.fetch_and_save(code)
+            else:
+                fetcher.import_enabled_plans()
+        except ImportError as e:
+            raise Exception(f"无法导入历史净值模块: {e}")
+        except Exception as e:
+            raise Exception(f"抓取历史净值失败: {e}")
     
     def import_transactions_from_csv(self, csv_path: str):
         """Import transactions from CSV"""
@@ -165,10 +177,22 @@ class FundService:
     
     def update_pending_transactions(self):
         """Update pending transactions"""
-        from update_pending_transactions import PendingTransactionUpdater
-        
-        updater = PendingTransactionUpdater(db_path=self.db_path)
-        updater.process_pending_records()
+        try:
+            from update_pending_transactions import PendingTransactionUpdater
+            
+            # 找到配置文件路径
+            root_dir = Path(__file__).parent.parent.parent.parent
+            config_path = root_dir / 'auto_invest_setting.json'
+            
+            updater = PendingTransactionUpdater(
+                db_path=self.db_path,
+                config_file=str(config_path) if config_path.exists() else 'auto_invest_setting.json'
+            )
+            updater.process_pending_records()
+        except ImportError as e:
+            raise Exception(f"无法导入待确认交易更新模块: {e}")
+        except Exception as e:
+            raise Exception(f"更新待确认交易失败: {e}")
     
     def add_transaction(
         self,
