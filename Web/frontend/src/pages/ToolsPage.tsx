@@ -4,10 +4,8 @@ import {
   Plus, RefreshCw, TrendingUp
 } from 'lucide-react'
 import Layout from '../components/Layout'
-import { useFundStore } from '../stores/fundStore'
 
 export default function ToolsPage() {
-  const { fetchHistoricalNav, updatePending } = useFundStore()
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
