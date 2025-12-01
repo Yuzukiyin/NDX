@@ -140,14 +140,14 @@ async def execute_today_plans(
 ):
     """Execute auto-invest plans for today"""
     try:
-        from tradeDate import TradeDateChecker
-        
         # Get today's date
         today = datetime.now().strftime('%Y-%m-%d')
+        today_dt = datetime.now()
         
-        # Find config file
-        root_dir = Path(__file__).parent.parent.parent.parent
-        config_path = root_dir / 'auto_invest_setting.json'
+        # Simple trading day check (weekdays only)
+        is_weekend = today_dt.weekday() >= 5
+        if is_weekend:
+            return {"message": f"{today} 是周末，非交易日", "transactions_created": 0}
         
         # Get database path
         db_url = settings.database_url_async
@@ -158,16 +158,6 @@ async def execute_today_plans(
         else:
             db_path = "./ndx_users.db"
         
-        # Initialize checker
-        checker = TradeDateChecker(
-            config_file=str(config_path) if config_path.exists() else 'auto_invest_setting.json',
-            db_path=db_path
-        )
-        
-        # Check if today is a trading day
-        if not checker.is_trading_day(today):
-            return {"message": f"{today} 不是交易日", "transactions_created": 0}
-        
         # Get all enabled plans from database
         enabled_plans = service.get_all_plans()
         enabled_plans = [p for p in enabled_plans if p.enabled]
@@ -176,12 +166,16 @@ async def execute_today_plans(
             return {"message": "没有启用的定投计划", "transactions_created": 0}
         
         # Generate transactions for enabled plans
+        import sqlite3
         transactions_created = 0
+        
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        
         for plan in enabled_plans:
             # Check if plan should execute today based on frequency
             start_date = datetime.strptime(plan.start_date, '%Y-%m-%d')
             end_date = datetime.strptime(plan.end_date, '%Y-%m-%d')
-            today_dt = datetime.strptime(today, '%Y-%m-%d')
             
             if not (start_date <= today_dt <= end_date):
                 continue
@@ -190,22 +184,18 @@ async def execute_today_plans(
             if plan.frequency == 'daily':
                 should_execute = True
             elif plan.frequency == 'weekly':
-                # Execute on the same weekday as start_date
                 should_execute = (today_dt.weekday() == start_date.weekday())
             elif plan.frequency == 'monthly':
-                # Execute on the same day of month as start_date
                 should_execute = (today_dt.day == start_date.day)
             
             if should_execute:
-                # Get T+1 confirm date
-                confirm_date = checker.get_next_trading_day(today_dt, 1)
+                # Calculate T+1 confirm date (next weekday)
+                confirm_dt = today_dt + timedelta(days=1)
+                while confirm_dt.weekday() >= 5:
+                    confirm_dt += timedelta(days=1)
+                confirm_date = confirm_dt.strftime('%Y-%m-%d')
                 
-                # Create transaction record
-                import sqlite3
-                conn = sqlite3.connect(db_path)
-                cur = conn.cursor()
-                
-                # Check if transaction already exists for today
+                # Check if transaction already exists
                 cur.execute("""
                     SELECT COUNT(*) FROM transactions
                     WHERE user_id = ? AND fund_code = ? AND transaction_date = ?
@@ -222,15 +212,15 @@ async def execute_today_plans(
                         plan.fund_code,
                         plan.fund_name,
                         today,
-                        confirm_date.strftime('%Y-%m-%d'),
+                        confirm_date,
                         '买入',
                         plan.amount,
                         f"[待确认] {plan.plan_name}"
                     ))
-                    conn.commit()
                     transactions_created += 1
-                
-                conn.close()
+        
+        conn.commit()
+        conn.close()
         
         return {
             "message": f"成功创建 {transactions_created} 条定投交易记录",
@@ -238,11 +228,6 @@ async def execute_today_plans(
             "date": today
         }
         
-    except ImportError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"无法导入交易日期检查模块: {e}"
-        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
