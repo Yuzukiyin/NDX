@@ -45,6 +45,7 @@ ON fund_overview(user_id, fund_code);
 -- NAV history is global (shared across users)
 CREATE TABLE IF NOT EXISTS fund_nav_history (
     nav_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
     fund_code TEXT NOT NULL,
     fund_name TEXT NOT NULL,
     price_date TEXT NOT NULL,
@@ -53,11 +54,11 @@ CREATE TABLE IF NOT EXISTS fund_nav_history (
     daily_growth_rate REAL,
     data_source TEXT DEFAULT 'fundSpider',
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(fund_code, price_date, data_source)
+    UNIQUE(user_id, fund_code, price_date, data_source)
 );
 
 CREATE INDEX IF NOT EXISTS idx_fund_nav_history_code_date
-ON fund_nav_history(fund_code, price_date);
+ON fund_nav_history(user_id, fund_code, price_date);
 
 -- =========================
 -- Triggers keeping overview in sync
@@ -214,19 +215,19 @@ SELECT
     fo.last_updated
 FROM fund_overview fo
 LEFT JOIN (
-    SELECT fA.fund_code, fA.price_date, fA.unit_nav, fA.daily_growth_rate, fA.data_source
+    SELECT fA.user_id, fA.fund_code, fA.price_date, fA.unit_nav, fA.daily_growth_rate, fA.data_source
     FROM fund_nav_history fA
     JOIN (
-        SELECT fund_code, MAX(price_date) AS max_date
+        SELECT user_id, fund_code, MAX(price_date) AS max_date
         FROM fund_nav_history
-        GROUP BY fund_code
-    ) mx ON mx.fund_code = fA.fund_code AND mx.max_date = fA.price_date
+        GROUP BY user_id, fund_code
+    ) mx ON mx.user_id = fA.user_id AND mx.fund_code = fA.fund_code AND mx.max_date = fA.price_date
     JOIN (
-        SELECT fund_code, price_date, MAX(fetched_at) AS max_fetch
+        SELECT user_id, fund_code, price_date, MAX(fetched_at) AS max_fetch
         FROM fund_nav_history
-        GROUP BY fund_code, price_date
-    ) mf ON mf.fund_code = fA.fund_code AND mf.price_date = fA.price_date AND mf.max_fetch = fA.fetched_at
-) mp ON fo.fund_code = mp.fund_code;
+        GROUP BY user_id, fund_code, price_date
+    ) mf ON mf.user_id = fA.user_id AND mf.fund_code = fA.fund_code AND mf.price_date = fA.price_date AND mf.max_fetch = fA.fetched_at
+) mp ON fo.user_id = mp.user_id AND fo.fund_code = mp.fund_code;
 
 DROP VIEW IF EXISTS profit_summary;
 CREATE VIEW profit_summary AS
@@ -244,17 +245,17 @@ SELECT
     END as total_return_rate
 FROM fund_overview fo
 LEFT JOIN (
-    SELECT fA.fund_code, fA.unit_nav
+    SELECT fA.user_id, fA.fund_code, fA.unit_nav
     FROM fund_nav_history fA
     JOIN (
-        SELECT fund_code, MAX(price_date) AS max_date
+        SELECT user_id, fund_code, MAX(price_date) AS max_date
         FROM fund_nav_history
-        GROUP BY fund_code
-    ) mx ON mx.fund_code = fA.fund_code AND mx.max_date = fA.price_date
+        GROUP BY user_id, fund_code
+    ) mx ON mx.user_id = fA.user_id AND mx.fund_code = fA.fund_code AND mx.max_date = fA.price_date
     JOIN (
-        SELECT fund_code, price_date, MAX(fetched_at) AS max_fetch
+        SELECT user_id, fund_code, price_date, MAX(fetched_at) AS max_fetch
         FROM fund_nav_history
-        GROUP BY fund_code, price_date
-    ) mf ON mf.fund_code = fA.fund_code AND mf.price_date = fA.price_date AND mf.max_fetch = fA.fetched_at
-) mp ON fo.fund_code = mp.fund_code
+        GROUP BY user_id, fund_code, price_date
+    ) mf ON mf.user_id = fA.user_id AND mf.fund_code = fA.fund_code AND mf.price_date = fA.price_date AND mf.max_fetch = fA.fetched_at
+) mp ON fo.user_id = mp.user_id AND fo.fund_code = mp.fund_code
 GROUP BY fo.user_id;

@@ -105,8 +105,8 @@ class FundService:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        query = "SELECT price_date, unit_nav, cumulative_nav, daily_growth_rate FROM fund_nav_history WHERE fund_code = ?"
-        params = [fund_code]
+        query = "SELECT price_date, unit_nav, cumulative_nav, daily_growth_rate FROM fund_nav_history WHERE user_id = ? AND fund_code = ?"
+        params = [self.user_id, fund_code]
         
         if start_date:
             query += " AND price_date >= ?"
@@ -148,16 +148,22 @@ class FundService:
     def fetch_history_nav(self, fund_codes: Optional[List[str]] = None):
         """Fetch historical NAV data"""
         try:
+            # 导入时添加路径
+            import sys
+            backend_dir = Path(__file__).parent.parent.parent
+            if str(backend_dir) not in sys.path:
+                sys.path.insert(0, str(backend_dir))
+            
             from fetch_history_nav import HistoryNavFetcher
             
             # 找到配置文件路径
-            root_dir = Path(__file__).parent.parent.parent.parent
-            config_path = root_dir / 'auto_invest_setting.json'
+            backend_root = Path(__file__).parent.parent.parent
+            config_path = backend_root / 'auto_invest_setting.json'
             
             fetcher = HistoryNavFetcher(
                 config_path=str(config_path) if config_path.exists() else 'auto_invest_setting.json',
                 db_path=self.db_path,
-                user_id=self.user_id  # 添加user_id支持
+                user_id=self.user_id
             )
             
             # 调用正确的方法
@@ -177,16 +183,22 @@ class FundService:
     def update_pending_transactions(self):
         """Update pending transactions"""
         try:
+            # 导入时添加路径
+            import sys
+            backend_dir = Path(__file__).parent.parent.parent
+            if str(backend_dir) not in sys.path:
+                sys.path.insert(0, str(backend_dir))
+            
             from update_pending_transactions import PendingTransactionUpdater
             
             # 找到配置文件路径
-            root_dir = Path(__file__).parent.parent.parent.parent
-            config_path = root_dir / 'auto_invest_setting.json'
+            backend_root = Path(__file__).parent.parent.parent
+            config_path = backend_root / 'auto_invest_setting.json'
             
             updater = PendingTransactionUpdater(
                 db_path=self.db_path,
                 config_file=str(config_path) if config_path.exists() else 'auto_invest_setting.json',
-                user_id=self.user_id  # 添加user_id
+                user_id=self.user_id
             )
             updater.process_pending_records()
         except ImportError as e:
@@ -237,15 +249,16 @@ class FundService:
             # Check if record already exists
             cursor.execute("""
                 SELECT 1 FROM fund_nav_history 
-                WHERE fund_code = ? AND price_date = ?
-            """, (record['fund_code'], record['price_date']))
+                WHERE user_id = ? AND fund_code = ? AND price_date = ?
+            """, (self.user_id, record['fund_code'], record['price_date']))
             
             if not cursor.fetchone():
                 cursor.execute("""
                     INSERT INTO fund_nav_history (
-                        fund_code, fund_name, price_date, unit_nav, fetched_at
-                    ) VALUES (?, ?, ?, ?, ?)
+                        user_id, fund_code, fund_name, price_date, unit_nav, fetched_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                 """, (
+                    self.user_id,
                     record['fund_code'],
                     record.get('fund_name', ''),
                     record['price_date'],
