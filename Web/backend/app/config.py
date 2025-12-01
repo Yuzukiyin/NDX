@@ -46,7 +46,8 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
         "http://127.0.0.1:5173",
-        "https://*.vercel.app",  # Vercel部署域名
+        "https://ndx-git-main-yuzukiyins-projects.vercel.app",
+        "https://ndx-5ymfcxnqn-yuzukiyins-projects.vercel.app",
     ]
     
     # Email (optional, for verification)
