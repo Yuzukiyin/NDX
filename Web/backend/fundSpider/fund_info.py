@@ -7,7 +7,7 @@ import pandas as pd
 
 class FuncInfo(object):
     def __init__(self, code, name=None):
-        self.code = code,                           # 基金代码
+        self.code = code                            # 基金代码
         self.name = name                            # 基金名               
         self._unit_value_ls = []                    # 单位净值list
         self._cumulative_value_ls = []              # 累计净值list
