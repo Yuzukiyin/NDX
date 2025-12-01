@@ -6,7 +6,6 @@ import DashboardPage from './pages/DashboardPage'
 import FundsPage from './pages/FundsPage'
 import TransactionsPage from './pages/TransactionsPage'
 import ToolsPage from './pages/ToolsPage'
-import Layout from './components/Layout'
 
 function App() {
   const { isAuthenticated } = useAuthStore()
@@ -17,12 +16,10 @@ function App() {
         <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" />} />
         <Route path="/register" element={!isAuthenticated ? <RegisterPage /> : <Navigate to="/dashboard" />} />
         
-        <Route element={<Layout />}>
-          <Route path="/dashboard" element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />} />
-          <Route path="/funds" element={isAuthenticated ? <FundsPage /> : <Navigate to="/login" />} />
-          <Route path="/transactions" element={isAuthenticated ? <TransactionsPage /> : <Navigate to="/login" />} />
-          <Route path="/tools" element={isAuthenticated ? <ToolsPage /> : <Navigate to="/login" />} />
-        </Route>
+        <Route path="/dashboard" element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />} />
+        <Route path="/funds" element={isAuthenticated ? <FundsPage /> : <Navigate to="/login" />} />
+        <Route path="/transactions" element={isAuthenticated ? <TransactionsPage /> : <Navigate to="/login" />} />
+        <Route path="/tools" element={isAuthenticated ? <ToolsPage /> : <Navigate to="/login" />} />
         
         <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
       </Routes>

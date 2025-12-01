@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
-  Plus, Upload, Download, RefreshCw, TrendingUp, 
-  Calendar, DollarSign, FileText, Settings
+  Plus, RefreshCw, TrendingUp
 } from 'lucide-react'
 import Layout from '../components/Layout'
 import { useFundStore } from '../stores/fundStore'
 
 export default function ToolsPage() {
-  const { fetchHistoricalNav, updatePending, initializeDatabase } = useFundStore()
+  const { fetchHistoricalNav, updatePending } = useFundStore()
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -23,25 +22,14 @@ export default function ToolsPage() {
     note: ''
   })
 
-  // 定投设置表单
-  const [showAutoInvest, setShowAutoInvest] = useState(false)
-  const [autoInvestForm, setAutoInvestForm] = useState({
-    fund_code: '',
-    plan_name: '',
-    amount: '',
-    frequency: '月',
-    day: '1',
-    start_date: '',
-    end_date: ''
-  })
-
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setMessage('')
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/funds/transactions`, {
+      const apiUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/funds/transactions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -122,13 +110,6 @@ export default function ToolsPage() {
       icon: RefreshCw,
       color: 'orange',
       action: handleUpdatePending
-    },
-    {
-      title: '设置定投计划',
-      description: '配置自动定投规则',
-      icon: Calendar,
-      color: 'purple',
-      action: () => setShowAutoInvest(true)
     }
   ]
 
