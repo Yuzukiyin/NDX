@@ -24,11 +24,14 @@ git push origin main
    - 点击 "Import"
 
 3. **配置项目**:
-   - Framework Preset: `Vite`
+   - Framework Preset: `Vite` (自动检测,因为前端使用Vite构建React应用)
    - Root Directory: `Web/frontend`
    - Build Command: `npm run build`
    - Output Directory: `dist`
    - Install Command: `npm install`
+   
+   > 💡 **说明**: 虽然是React应用,但Vercel检测到Vite配置文件,所以显示"Vite"。
+   > Vite是构建工具,React是UI框架,两者配合使用。
 
 4. **环境变量**:
    - 添加 `VITE_API_BASE_URL`: `https://your-backend-url.com`
