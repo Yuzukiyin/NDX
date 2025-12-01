@@ -10,9 +10,9 @@ from update_pending_transactions import PendingTransactionUpdater
 from nav_plot import NavPlotter
 
 def main():
-    # if input("初始化数据库？(y/[n]): ").strip().lower() == 'y':
-    #     _ = InitDatabase(db_path='fund.db')
-    #     print("数据库初始化完成：已生成 fund.db")
+    if input("初始化数据库？(y/[n]): ").strip().lower() == 'y':
+        _ = InitDatabase(db_path='fund.db')
+        print("数据库初始化完成：已生成 fund.db")
 
     if input("抓取历史净值？([y]/n): ").strip().lower() != 'n':
         fetcher = HistoryNavFetcher()
@@ -34,19 +34,19 @@ def main():
         updater.process_pending_records()
         print("待确认交易记录更新完成。")
     
-    # if input("导出历史净值数据/图表？(y/[n]): ").strip().lower() == 'y':
-    #     fund_code = input("请输入基金代码: ").strip()
-    #     if fund_code:
-    #         print("选择输出模式:")
-    #         print("1.CSV")
-    #         print("2.PNG")
-    #         print("3.同时输出CSV和PNG")
-    #         mode_choice = input("请选择 (1/2/[3]): ").strip() or '3'
-    #         mode_map = {'1': 'csv', '2': 'png', '3': 'both'}
-    #         mode = mode_map.get(mode_choice, 'both')
+    if input("导出历史净值数据/图表？(y/[n]): ").strip().lower() == 'y':
+        fund_code = input("请输入基金代码: ").strip()
+        if fund_code:
+            print("选择输出模式:")
+            print("1.CSV")
+            print("2.PNG")
+            print("3.同时输出CSV和PNG")
+            mode_choice = input("请选择 (1/2/[3]): ").strip() or '3'
+            mode_map = {'1': 'csv', '2': 'png', '3': 'both'}
+            mode = mode_map.get(mode_choice, 'both')
             
-    #         plotter = NavPlotter()
-    #         plotter.export_nav_data(fund_code, None, None, None, mode)
+            plotter = NavPlotter()
+            plotter.export_nav_data(fund_code, None, None, None, mode)
     
 
 if __name__ == '__main__':

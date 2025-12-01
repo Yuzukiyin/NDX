@@ -4,7 +4,6 @@ venv
 
 fund.db
 transactions.csv
-transactions_imagine.csv
 transactions_new.csv
 transactions_old.csv
 auto_invest_setting.json

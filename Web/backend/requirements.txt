@@ -1,0 +1,28 @@
+# Web Backend Dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dateutil==2.8.2
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy==2.0.23
+aiosqlite==0.19.0
+
+# Email
+fastapi-mail==1.4.1
+email-validator==2.1.0
+
+# Original NDX dependencies
+beautifulsoup4>=4.9.3
+requests>=2.25.1
+pandas>=1.2.0
+matplotlib>=3.3.0
+lxml>=4.6.2
+numpy>=1.19.5
+
+# CORS
+fastapi-cors==0.0.6
