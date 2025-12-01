@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./ndx_users.db"
     FUND_DB_PATH: str = "../../../fund.db"  # Original fund database
+
+    # Admin bootstrap (optional)
+    # If provided, the app will auto-create this admin on first start
+    ADMIN_EMAIL: Optional[str] = None
+    ADMIN_PASSWORD: Optional[str] = None
+    ADMIN_USERNAME: Optional[str] = None
     
     @property
     def database_url_async(self) -> str:
