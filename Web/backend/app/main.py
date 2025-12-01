@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from .config import settings
 from .utils.database import init_db, async_session_factory
-from .routes import auth, funds
+from .routes import auth, funds, auto_invest
 
 
 @asynccontextmanager
@@ -70,6 +70,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router)
 app.include_router(funds.router)
+app.include_router(auto_invest.router)
 
 
 @app.get("/")

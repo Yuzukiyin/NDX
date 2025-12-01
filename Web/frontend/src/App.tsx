@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage'
 import FundsPage from './pages/FundsPage'
 import TransactionsPage from './pages/TransactionsPage'
 import ToolsPage from './pages/ToolsPage'
+import AutoInvestPage from './pages/AutoInvestPage'
 
 function App() {
   const { isAuthenticated } = useAuthStore()
@@ -20,6 +21,7 @@ function App() {
         <Route path="/funds" element={isAuthenticated ? <FundsPage /> : <Navigate to="/login" />} />
         <Route path="/transactions" element={isAuthenticated ? <TransactionsPage /> : <Navigate to="/login" />} />
         <Route path="/tools" element={isAuthenticated ? <ToolsPage /> : <Navigate to="/login" />} />
+        <Route path="/auto-invest" element={isAuthenticated ? <AutoInvestPage /> : <Navigate to="/login" />} />
         
         <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
       </Routes>
