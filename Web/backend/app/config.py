@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./ndx_users.db"
     FUND_DB_PATH: str = "../../../fund.db"  # Original fund database
     
+    @property
+    def database_url_async(self) -> str:
+        """Ensure DATABASE_URL uses async driver"""
+        url = self.DATABASE_URL
+        if url.startswith("sqlite:///") and "+aiosqlite" not in url:
+            url = url.replace("sqlite:///", "sqlite+aiosqlite:///")
+        return url
+    
     # CORS
     CORS_ORIGINS: list = [
         "http://localhost:3000",

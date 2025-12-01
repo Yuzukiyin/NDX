@@ -5,7 +5,7 @@ from ..config import settings
 
 # Create async engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    settings.database_url_async,
     echo=settings.DEBUG,
     future=True
 )
