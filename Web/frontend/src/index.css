@@ -3,21 +3,114 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Apple-inspired monochrome palette */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-2xl: 24px;
+  }
+
   * {
     @apply border-gray-200;
   }
   
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  /* Glass morphism card */
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-xl border border-gray-200/50;
+  }
+
+  /* Elastic animations */
+  .elastic-sm {
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .elastic-md {
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .elastic-bounce {
+    transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  /* Hover lift effect */
+  .hover-lift {
+    @apply elastic-sm;
+  }
+
+  .hover-lift:hover {
+    @apply -translate-y-1 shadow-lg;
+  }
+
+  /* Button styles */
+  .btn-primary {
+    @apply px-6 py-3 bg-gray-900 text-white rounded-2xl font-medium;
+    @apply hover:bg-gray-800 active:scale-95;
+    @apply elastic-sm shadow-md hover:shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 bg-gray-100 text-gray-900 rounded-2xl font-medium;
+    @apply hover:bg-gray-200 active:scale-95;
+    @apply elastic-sm;
+  }
+
+  /* Input styles */
+  .input-primary {
+    @apply w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl;
+    @apply focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent;
+    @apply elastic-sm placeholder:text-gray-400;
+  }
+
+  /* Card styles */
+  .card-minimal {
+    @apply bg-white rounded-3xl border border-gray-200/60 shadow-sm;
+    @apply hover:shadow-md elastic-sm;
+  }
+
+  .card-glass {
+    @apply glass-card rounded-3xl shadow-lg;
+  }
+
+  /* Text gradient */
+  .text-gradient {
+    @apply bg-gradient-to-r from-gray-900 via-gray-700 to-gray-900 bg-clip-text text-transparent;
   }
 }
 
 @layer utilities {
   .spring-animation {
-    transition-timing-function: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
   
   .elastic-animation {
-    transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition-timing-function: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  /* Custom shadows */
+  .shadow-soft-sm {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  }
+
+  .shadow-soft-md {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.03);
+  }
+
+  .shadow-soft-lg {
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.06), 0 4px 6px rgba(0, 0, 0, 0.04);
+  }
+
+  .shadow-soft-xl {
+    box-shadow: 0 20px 25px rgba(0, 0, 0, 0.07), 0 8px 10px rgba(0, 0, 0, 0.04);
   }
 }

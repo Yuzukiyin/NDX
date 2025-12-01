@@ -2,6 +2,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from ..config import settings
+from pathlib import Path
 
 # Create async engine
 engine = create_async_engine(
@@ -34,3 +35,14 @@ async def init_db():
     from ..models.user import Base
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Ensure fund tables exist in the same SQLite file
+        try:
+            # Detect if fund_overview exists; if not, apply schema
+            res = await conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='fund_overview'")
+            if res.fetchone() is None:
+                schema_path = Path(__file__).parent.parent / 'db' / 'fund_multitenant.sql'
+                sql = schema_path.read_text(encoding='utf-8')
+                await conn.exec_driver_sql(sql)
+        except Exception as e:
+            # Log and continue. FundService can also initialize on demand if needed.
+            print(f"⚠️ Fund schema init skipped: {e}")

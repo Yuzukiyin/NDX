@@ -15,15 +15,19 @@ class FundService:
     """Service for accessing fund data"""
     
     def __init__(self, user_id: int):
-        """Initialize with user-specific database"""
+        """Initialize with user-specific context.
+        Now all fund data is stored in the unified ndx_users.db.
+        """
         self.user_id = user_id
-        # 特殊处理: ID为1的用户使用已有的fund.db
-        if user_id == 1:
-            self.db_path = "../../../fund.db"
+        # Parse sqlite path from DATABASE_URL (sqlite+aiosqlite:///./ndx_users.db)
+        db_url = settings.database_url_async
+        if db_url.startswith("sqlite+aiosqlite:///"):
+            self.db_path = db_url.replace("sqlite+aiosqlite:///", "")
+        elif db_url.startswith("sqlite:///"):
+            self.db_path = db_url.replace("sqlite:///", "")
         else:
-            # 其他用户使用独立数据库
-            self.db_path = f"./user_data/user_{user_id}_fund.db"
-            Path("./user_data").mkdir(exist_ok=True)
+            # Fallback to default relative file
+            self.db_path = "./ndx_users.db"
     
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection"""
@@ -36,7 +40,10 @@ class FundService:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute("SELECT * FROM fund_realtime_overview ORDER BY fund_code")
+        cursor.execute(
+            "SELECT * FROM fund_realtime_overview WHERE user_id = ? ORDER BY fund_code",
+            (self.user_id,)
+        )
         rows = cursor.fetchall()
         conn.close()
         
@@ -48,8 +55,8 @@ class FundService:
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT * FROM fund_realtime_overview WHERE fund_code = ?",
-            (fund_code,)
+            "SELECT * FROM fund_realtime_overview WHERE user_id = ? AND fund_code = ?",
+            (self.user_id, fund_code)
         )
         row = cursor.fetchone()
         conn.close()
@@ -69,17 +76,18 @@ class FundService:
         if fund_code:
             cursor.execute(
                 """SELECT * FROM transactions 
-                WHERE fund_code = ? 
+                WHERE user_id = ? AND fund_code = ? 
                 ORDER BY transaction_date DESC, transaction_id DESC 
                 LIMIT ? OFFSET ?""",
-                (fund_code, limit, offset)
+                (self.user_id, fund_code, limit, offset)
             )
         else:
             cursor.execute(
                 """SELECT * FROM transactions 
+                WHERE user_id = ?
                 ORDER BY transaction_date DESC, transaction_id DESC 
                 LIMIT ? OFFSET ?""",
-                (limit, offset)
+                (self.user_id, limit, offset)
             )
         
         rows = cursor.fetchall()
@@ -121,18 +129,21 @@ class FundService:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute("SELECT * FROM profit_summary")
+        cursor.execute("SELECT * FROM profit_summary WHERE user_id = ?", (self.user_id,))
         row = cursor.fetchone()
         conn.close()
         
         return ProfitSummary(**dict(row)) if row else None
     
     def initialize_user_database(self):
-        """Initialize user's fund database with schema"""
-        if not Path(self.db_path).exists():
-            # Import original init function
-            from init_database import InitDatabase
-            InitDatabase(db_path=self.db_path)
+        """Ensure fund tables exist in unified database"""
+        schema_file = Path(__file__).parent.parent / 'db' / 'fund_multitenant.sql'
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fund_overview'")
+        if cursor.fetchone() is None and schema_file.exists():
+            conn.executescript(schema_file.read_text(encoding='utf-8'))
+        conn.close()
     
     def fetch_history_nav(self, fund_codes: Optional[List[str]] = None):
         """Fetch historical NAV data"""

@@ -37,7 +37,7 @@ Railway 会自动检测到 Python 项目，但需要手动配置：
 ```env
 # 必需的环境变量
 SECRET_KEY=你的32位随机密钥生成方法见下方
-DATABASE_URL=sqlite:///./fund_manager.db
+DATABASE_URL=sqlite:///./ndx_users.db
 CORS_ORIGINS=https://ndx-khaki.vercel.app
 
 # 可选的邮件配置（如果需要）
@@ -117,7 +117,7 @@ railway init
 
 # 5. 添加环境变量
 railway variables set SECRET_KEY=你的密钥
-railway variables set DATABASE_URL=sqlite:///./fund_manager.db
+railway variables set DATABASE_URL=sqlite:///./ndx_users.db
 railway variables set CORS_ORIGINS=https://ndx-khaki.vercel.app
 
 # 6. 部署
@@ -148,7 +148,7 @@ railway run python init_admin.py
 ### 3. 添加环境变量
 在 "Environment" 标签页添加：
 - `SECRET_KEY`: 生成的密钥
-- `DATABASE_URL`: `sqlite:///./fund_manager.db`
+- `DATABASE_URL`: `sqlite:///./ndx_users.db`
 - `CORS_ORIGINS`: `https://ndx-khaki.vercel.app`
 
 ### 4. 部署
