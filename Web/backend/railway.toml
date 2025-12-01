@@ -5,7 +5,3 @@ builder = "nixpacks"
 startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
-
-# 添加 Volume 持久化数据库
-[[deploy.volumes]]
-mountPath = "/app/data"

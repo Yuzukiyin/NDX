@@ -12,6 +12,8 @@ pydantic-settings==2.1.0
 # Database
 sqlalchemy==2.0.23
 aiosqlite==0.19.0
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
 
 # Email
 fastapi-mail==1.4.1
