@@ -5,6 +5,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import FundsPage from './pages/FundsPage'
 import TransactionsPage from './pages/TransactionsPage'
+import ToolsPage from './pages/ToolsPage'
 import Layout from './components/Layout'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
           <Route path="/dashboard" element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />} />
           <Route path="/funds" element={isAuthenticated ? <FundsPage /> : <Navigate to="/login" />} />
           <Route path="/transactions" element={isAuthenticated ? <TransactionsPage /> : <Navigate to="/login" />} />
+          <Route path="/tools" element={isAuthenticated ? <ToolsPage /> : <Navigate to="/login" />} />
         </Route>
         
         <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />

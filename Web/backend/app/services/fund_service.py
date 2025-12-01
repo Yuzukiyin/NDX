@@ -169,3 +169,65 @@ class FundService:
         
         updater = PendingTransactionUpdater(db_path=self.db_path)
         updater.process_pending_records()
+    
+    def add_transaction(
+        self,
+        fund_code: str,
+        fund_name: str,
+        transaction_date: str,
+        transaction_type: str,
+        amount: Optional[float] = None,
+        shares: Optional[float] = None,
+        unit_nav: Optional[float] = None,
+        note: str = '',
+        nav_date: Optional[str] = None,
+        target_amount: Optional[float] = None
+    ):
+        """Add a new transaction"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # Calculate amount if shares and unit_nav provided
+        if shares and unit_nav:
+            amount = round(shares * unit_nav, 2)
+        
+        cursor.execute("""
+            INSERT INTO transactions (
+                user_id, fund_code, fund_name, transaction_date, nav_date,
+                transaction_type, target_amount, shares, unit_nav, amount, note
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            self.user_id, fund_code, fund_name, transaction_date, nav_date,
+            transaction_type, target_amount, shares, unit_nav, amount, note
+        ))
+        
+        conn.commit()
+        conn.close()
+    
+    def add_nav_history_batch(self, nav_records: List[dict]):
+        """Batch add NAV history records"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        for record in nav_records:
+            # Check if record already exists
+            cursor.execute("""
+                SELECT 1 FROM fund_nav_history 
+                WHERE fund_code = ? AND price_date = ?
+            """, (record['fund_code'], record['price_date']))
+            
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO fund_nav_history (
+                        fund_code, fund_name, price_date, unit_nav, fetched_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                """, (
+                    record['fund_code'],
+                    record.get('fund_name', ''),
+                    record['price_date'],
+                    record['unit_nav'],
+                    record.get('fetched_at', datetime.now().isoformat())
+                ))
+        
+        conn.commit()
+        conn.close()

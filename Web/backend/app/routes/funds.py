@@ -161,3 +161,77 @@ async def update_pending(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"更新待确认交易失败: {str(e)}"
         )
+
+
+@router.post("/transactions", status_code=status.HTTP_201_CREATED)
+async def create_transaction(
+    transaction: dict,
+    fund_service: FundService = Depends(get_current_fund_service)
+):
+    """Create a new transaction"""
+    try:
+        fund_service.add_transaction(
+            fund_code=transaction['fund_code'],
+            fund_name=transaction.get('fund_name', ''),
+            transaction_date=transaction['transaction_date'],
+            transaction_type=transaction['transaction_type'],
+            amount=transaction.get('amount'),
+            shares=transaction.get('shares'),
+            unit_nav=transaction.get('unit_nav'),
+            note=transaction.get('note', ''),
+            nav_date=transaction.get('nav_date'),
+            target_amount=transaction.get('target_amount')
+        )
+        return {"message": "交易记录创建成功"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"创建交易记录失败: {str(e)}"
+        )
+
+
+@router.post("/transactions/batch", status_code=status.HTTP_201_CREATED)
+async def batch_create_transactions(
+    transactions: List[dict],
+    fund_service: FundService = Depends(get_current_fund_service)
+):
+    """Batch create transactions"""
+    try:
+        success_count = 0
+        for trans in transactions:
+            fund_service.add_transaction(
+                fund_code=trans['fund_code'],
+                fund_name=trans.get('fund_name', ''),
+                transaction_date=trans['transaction_date'],
+                transaction_type=trans['transaction_type'],
+                amount=trans.get('amount'),
+                shares=trans.get('shares'),
+                unit_nav=trans.get('unit_nav'),
+                note=trans.get('note', ''),
+                nav_date=trans.get('nav_date'),
+                target_amount=trans.get('target_amount')
+            )
+            success_count += 1
+        return {"message": f"成功导入{success_count}条交易记录"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"批量导入失败: {str(e)}"
+        )
+
+
+@router.post("/nav-history/batch", status_code=status.HTTP_201_CREATED)
+async def batch_create_nav_history(
+    nav_records: List[dict],
+    fund_service: FundService = Depends(get_current_fund_service)
+):
+    """Batch create NAV history records"""
+    try:
+        fund_service.add_nav_history_batch(nav_records)
+        return {"message": f"成功导入{len(nav_records)}条净值记录"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"批量导入净值失败: {str(e)}"
+        )
+

@@ -69,6 +69,18 @@ export default function Layout({ children }: LayoutProps) {
               >
                 交易
               </Link>
+              <Link
+                to="/tools"
+                className={`
+                  px-6 py-3 rounded-2xl font-semibold text-sm transition-all duration-300
+                  ${location.pathname === '/tools'
+                    ? 'bg-gray-900 text-white shadow-lg'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }
+                `}
+              >
+                工具
+              </Link>
             </div>
 
             {/* User Menu */}
