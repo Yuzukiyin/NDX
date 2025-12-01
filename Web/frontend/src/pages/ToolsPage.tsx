@@ -67,10 +67,24 @@ export default function ToolsPage() {
     setLoading(true)
     setMessage('正在抓取历史净值...')
     try {
-      await fetchHistoricalNav()
-      setMessage('✅ 历史净值抓取完成!')
+      const apiUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000'
+      const token = localStorage.getItem('access_token')
+      const response = await fetch(`${apiUrl}/funds/fetch-nav`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      })
+      if (response.ok) {
+        setMessage('✅ 历史净值抓取完成!')
+      } else {
+        const error = await response.json()
+        setMessage(`❌ 抓取失败: ${error.detail}`)
+      }
     } catch (error: any) {
-      setMessage(`❌ 抓取失败: ${error.message}`)
+      setMessage(`❌ 网络错误: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -80,10 +94,23 @@ export default function ToolsPage() {
     setLoading(true)
     setMessage('正在更新待确认交易...')
     try {
-      await updatePending()
-      setMessage('✅ 待确认交易更新完成!')
+      const apiUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000'
+      const token = localStorage.getItem('access_token')
+      const response = await fetch(`${apiUrl}/funds/update-pending`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        setMessage('✅ 待确认交易更新完成!')
+      } else {
+        const error = await response.json()
+        setMessage(`❌ 更新失败: ${error.detail}`)
+      }
     } catch (error: any) {
-      setMessage(`❌ 更新失败: ${error.message}`)
+      setMessage(`❌ 网络错误: ${error.message}`)
     } finally {
       setLoading(false)
     }

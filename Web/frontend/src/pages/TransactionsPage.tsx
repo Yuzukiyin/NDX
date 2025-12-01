@@ -15,11 +15,10 @@ export default function TransactionsPage() {
   const [formData, setFormData] = useState({
     fund_code: '',
     fund_name: '',
-    transaction_date: '',
-    shares: '',
-    unit_nav: '',
+    transaction_date: new Date().toISOString().split('T')[0],
     amount: '',
-    transaction_type: 'buy' as 'buy' | 'sell',
+    transaction_type: '\u4e70\u5165',
+    note: ''
   })
   const [loading, setLoading] = useState(false)
 
@@ -47,20 +46,18 @@ export default function TransactionsPage() {
         fund_code: formData.fund_code,
         fund_name: formData.fund_name,
         transaction_date: formData.transaction_date,
-        shares: parseFloat(formData.shares),
-        unit_nav: parseFloat(formData.unit_nav),
         amount: parseFloat(formData.amount),
         transaction_type: formData.transaction_type,
+        note: formData.note
       })
       await fetchTransactions()
       setFormData({
         fund_code: '',
         fund_name: '',
-        transaction_date: '',
-        shares: '',
-        unit_nav: '',
+        transaction_date: new Date().toISOString().split('T')[0],
         amount: '',
-        transaction_type: 'buy',
+        transaction_type: '买入',
+        note: ''
       })
       setIsAddModalOpen(false)
     } catch (error) {
@@ -254,71 +251,58 @@ export default function TransactionsPage() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2.5">基金代码</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.fund_code}
-                      onChange={(e) => setFormData({ ...formData, fund_code: e.target.value })}
-                      className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
-                      placeholder="例: 001234"
-                    />
-                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2.5">基金代码</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.fund_code}
+                        onChange={(e) => setFormData({ ...formData, fund_code: e.target.value })}
+                        className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
+                        placeholder="例如: 021000"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2.5">基金名称</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.fund_name}
-                      onChange={(e) => setFormData({ ...formData, fund_name: e.target.value })}
-                      className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
-                      placeholder="例: 某某基金"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2.5">交易日期</label>
-                    <input
-                      type="date"
-                      required
-                      value={formData.transaction_date}
-                      onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })}
-                      className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
-                    />
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2.5">基金名称</label>
+                      <input
+                        type="text"
+                        value={formData.fund_name}
+                        onChange={(e) => setFormData({ ...formData, fund_name: e.target.value })}
+                        className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
+                        placeholder="可选"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2.5">份额</label>
+                      <label className="block text-sm font-bold text-gray-700 mb-2.5">交易日期</label>
                       <input
-                        type="number"
-                        step="0.01"
+                        type="date"
                         required
-                        value={formData.shares}
-                        onChange={(e) => setFormData({ ...formData, shares: e.target.value })}
+                        value={formData.transaction_date}
+                        onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })}
                         className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
-                        placeholder="0.00"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2.5">净值</label>
-                      <input
-                        type="number"
-                        step="0.0001"
-                        required
-                        value={formData.unit_nav}
-                        onChange={(e) => setFormData({ ...formData, unit_nav: e.target.value })}
+                      <label className="block text-sm font-bold text-gray-700 mb-2.5">交易类型</label>
+                      <select
+                        value={formData.transaction_type}
+                        onChange={(e) => setFormData({ ...formData, transaction_type: e.target.value })}
                         className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
-                        placeholder="0.0000"
-                      />
+                      >
+                        <option value="买入">买入</option>
+                        <option value="卖出">卖出</option>
+                      </select>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2.5">金额</label>
+                    <label className="block text-sm font-bold text-gray-700 mb-2.5">金额 (元)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -331,35 +315,14 @@ export default function TransactionsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2.5">交易类型</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, transaction_type: 'buy' })}
-                        className={`
-                          px-6 py-4 rounded-2xl font-bold transition-all text-sm uppercase tracking-wide
-                          ${formData.transaction_type === 'buy'
-                            ? 'bg-gray-900 text-white shadow-xl scale-105'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }
-                        `}
-                      >
-                        买入
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, transaction_type: 'sell' })}
-                        className={`
-                          px-6 py-4 rounded-2xl font-bold transition-all text-sm uppercase tracking-wide
-                          ${formData.transaction_type === 'sell'
-                            ? 'bg-gray-900 text-white shadow-xl scale-105'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }
-                        `}
-                      >
-                        卖出
-                      </button>
-                    </div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2.5">备注</label>
+                    <textarea
+                      value={formData.note}
+                      onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                      className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
+                      rows={3}
+                      placeholder="可选备注信息"
+                    />
                   </div>
 
                   <div className="flex gap-4 pt-6">
@@ -375,7 +338,7 @@ export default function TransactionsPage() {
                       disabled={loading}
                       className="flex-1 px-6 py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
                     >
-                      {loading ? '添加中...' : '确认添加'}
+                      {loading ? '提交中...' : '提交'}
                     </button>
                   </div>
                 </form>
