@@ -50,7 +50,7 @@ export default function LoginPage() {
             NDX
           </h1>
           <p className="text-sm text-gray-300 tracking-[0.25em] uppercase font-light">
-            Fund Manager
+            Fund Manager System
           </p>
         </motion.div>
 
