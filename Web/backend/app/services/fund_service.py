@@ -26,7 +26,7 @@ class FundService:
                 """
                 SELECT fund_code, fund_name, total_shares::float, total_cost::float, average_buy_nav::float,
                        current_nav::float, current_value::float, profit::float, profit_rate::float,
-                       first_buy_date, last_transaction_date, last_nav_date, daily_growth_rate::float
+                       first_buy_date::text, last_transaction_date::text, last_nav_date, daily_growth_rate::float
                 FROM fund_realtime_overview
                 WHERE user_id = :user_id
                 ORDER BY fund_code
@@ -43,7 +43,7 @@ class FundService:
                 """
                 SELECT fund_code, fund_name, total_shares::float, total_cost::float, average_buy_nav::float,
                        current_nav::float, current_value::float, profit::float, profit_rate::float,
-                       first_buy_date, last_transaction_date, last_nav_date, daily_growth_rate::float
+                       first_buy_date::text, last_transaction_date::text, last_nav_date, daily_growth_rate::float
                 FROM fund_realtime_overview
                 WHERE user_id = :user_id AND fund_code = :fund_code
                 LIMIT 1
@@ -61,8 +61,8 @@ class FundService:
         offset: int = 0,
     ) -> List[Transaction]:
         base_query = """
-            SELECT transaction_id, fund_code, fund_name, transaction_date, nav_date,
-                   transaction_type, target_amount::float, shares::float, unit_nav::float, amount::float, note, created_at
+            SELECT transaction_id, fund_code, fund_name, transaction_date::text, nav_date::text,
+                   transaction_type, target_amount::float, shares::float, unit_nav::float, amount::float, note, created_at::text
             FROM transactions
             WHERE user_id = :user_id
         """
