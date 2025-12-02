@@ -16,21 +16,8 @@ async def main():
     from init_admin import create_admin_user
     await create_admin_user()
     
-    # 2. 同步定投配置
-    print("\n📊 步骤2: 同步定投配置...")
-    try:
-        from sync_auto_invest_config import sync_config_to_db
-        backend_dir = Path(__file__).parent
-        sync_config_to_db(
-            config_path=str(backend_dir / 'auto_invest_setting.json'),
-            db_path=str(backend_dir / 'ndx_users.db'),
-            user_id=1
-        )
-    except Exception as e:
-        print(f"⚠ 同步定投配置失败: {e}")
-    
-    # 3. 启动服务
-    print("\n🌐 步骤3: 启动后端服务...")
+    # 2. 启动服务
+    print("\n🌐 步骤2: 启动后端服务...")
     print("   访问地址: http://localhost:8000")
     print("   API文档: http://localhost:8000/docs")
     print("\n   管理员账户:")

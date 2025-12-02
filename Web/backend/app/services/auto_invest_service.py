@@ -9,7 +9,7 @@ from ..config import settings
 class AutoInvestService:
     """Service for managing auto-invest plans"""
     
-    def __init__(self, user_id: int, db_path: str = None):
+    def __init__(self, user_id: int):
         self.user_id = user_id
         # 使用 PostgreSQL 连接
         self.engine = create_engine(settings.database_url_sync, future=True)

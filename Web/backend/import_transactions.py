@@ -1,22 +1,45 @@
 """
-从CSV文件批量导入历史交易记录的模块
+从CSV文件批量导入历史交易记录的模块（PostgreSQL）
 """
-#transactions.csv
-#fund.db
 
-import sqlite3
 import csv
 from datetime import datetime
 import os
 from typing import Optional, Tuple
+from sqlalchemy import create_engine, text
 from tradeDate import TradeDateChecker
 
 class TransactionImporter:
-    def __init__(self, db_path: str = 'fund.db',csv_file='transactions.csv', user_id=1):
-        '''设置默认数据库路径和CSV文件路径'''
-        self.db_path = db_path
+    def __init__(self, db_url: str | None = None, csv_file='transactions.csv', user_id=1):
+        '''初始化交易导入器（仅支持PostgreSQL）'''
         self.csv_file = csv_file
         self.user_id = user_id
+        
+        # 获取数据库URL
+        if db_url:
+            self.db_url = self._resolve_db_url(db_url)
+        else:
+            self.db_url = os.getenv('DATABASE_URL', 'postgresql://localhost:5432/ndx')
+            self.db_url = self._resolve_db_url(self.db_url)
+        
+        self.engine = create_engine(self.db_url, future=True)
+
+    def _resolve_db_url(self, raw: str) -> str:
+        """将数据库URL转换为同步PostgreSQL格式"""
+        if not raw:
+            return 'postgresql://localhost:5432/ndx'
+        
+        # Railway等平台可能使用postgres://前缀
+        if raw.startswith('postgres://'):
+            raw = raw.replace('postgres://', 'postgresql://', 1)
+        
+        # 确保使用psycopg2驱动（同步）
+        if raw.startswith('postgresql+asyncpg://'):
+            raw = raw.replace('postgresql+asyncpg://', 'postgresql+psycopg2://', 1)
+        elif raw.startswith('postgresql://') and '+' not in raw:
+            raw = raw.replace('postgresql://', 'postgresql+psycopg2://', 1)
+        
+        return raw
 
     def add_transaction(self, 
                        fund_code: str,
@@ -31,11 +54,11 @@ class TransactionImporter:
        
         if transaction_date is None:
             transaction_date = datetime.now().strftime('%Y-%m-%d')
-        # 按精度约束进行四舍五入：shares(2), unit_nav(4), amount(2)
-        # 如果 shares/unit_nav 为 None 则 amount=0 （待确认）
+        
+        # 按精度约束进行四舍五入：shares(6), unit_nav(6), amount(2)
         if shares is not None and unit_nav is not None:
-            shares = round(shares, 2)
-            unit_nav = round(unit_nav, 4)
+            shares = round(shares, 6)
+            unit_nav = round(unit_nav, 6)
             amount = round(shares * unit_nav, 2)
         else:
             amount = 0  # 待确认记录
@@ -43,20 +66,31 @@ class TransactionImporter:
         if target_amount is not None:
             target_amount = round(target_amount, 2)
         
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO transactions (
-                fund_code, fund_name, transaction_date, nav_date, transaction_type,
-                target_amount, shares, unit_nav, amount, note
+        with self.engine.connect() as conn:
+            conn.execute(
+                text('''
+                    INSERT INTO transactions (
+                        user_id, fund_code, fund_name, transaction_date, nav_date, transaction_type,
+                        target_amount, shares, unit_nav, amount, note
+                    )
+                    VALUES (:user_id, :fund_code, :fund_name, :transaction_date, :nav_date, :transaction_type,
+                            :target_amount, :shares, :unit_nav, :amount, :note)
+                '''),
+                {
+                    'user_id': self.user_id,
+                    'fund_code': fund_code,
+                    'fund_name': fund_name,
+                    'transaction_date': transaction_date,
+                    'nav_date': nav_date,
+                    'transaction_type': transaction_type,
+                    'target_amount': target_amount,
+                    'shares': shares,
+                    'unit_nav': unit_nav,
+                    'amount': amount,
+                    'note': note
+                }
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (fund_code, fund_name, transaction_date, nav_date, transaction_type,
-              target_amount, shares, unit_nav, amount, note))
-        
-        conn.commit()
-        conn.close()
+            conn.commit()
         
         if shares is not None and unit_nav is not None:
             print(f"{transaction_type}：{fund_name}({fund_code}) {shares:.2f}份 @ ¥{unit_nav:.4f} = ¥{amount:.2f}")
@@ -65,11 +99,9 @@ class TransactionImporter:
 
     def import_from_csv(self, skip_header=True):
         """
-        从CSV文件导入交易记录
+        从CSV文件导入交易记录（PostgreSQL）
         
         Args:
-            self.db_path: fund.db 默认 
-            self.csv_file: transactions.csv 默认 
             skip_header: 跳过第一行标题
         """
         if not os.path.exists(self.csv_file):
@@ -83,13 +115,13 @@ class TransactionImporter:
         errors = []
         
         try:
-            checker = TradeDateChecker(db_path=self.db_path)
+            checker = TradeDateChecker(db_url=self.db_url)
             with open(self.csv_file, 'r', encoding='utf-8-sig') as f:
                 reader = csv.reader(f)
-                # 真实跳过表头行（如果需要）
                 if skip_header:
                     _ = next(reader, None)
                 line_start = 2 if skip_header else 1
+                
                 for row_num, row in enumerate(reader, start=line_start):
                     try:
                         # 支持两种格式:
@@ -117,6 +149,7 @@ class TransactionImporter:
                         # 验证类型
                         if transaction_type not in ['买入', '卖出']:
                             raise ValueError(f"交易类型必须是'买入'或'卖出'，当前值: {transaction_type}")
+                        
                         # 验证日期
                         try:
                             datetime.strptime(transaction_date, '%Y-%m-%d')
@@ -126,7 +159,7 @@ class TransactionImporter:
                         if simplified:
                             if amount <= 0:
                                 raise ValueError(f"金额必须大于0，当前值: {amount}")
-                            # 交易日期
+                            
                             trans_dt = datetime.strptime(transaction_date, '%Y-%m-%d')
                             # 净值日期：非交易日使用下一交易日
                             if checker.is_trading_day(trans_dt):
@@ -135,15 +168,14 @@ class TransactionImporter:
                                 nav_dt = checker.get_next_trading_day(trans_dt, 1)
                                 nav_date_str = nav_dt.strftime('%Y-%m-%d')
                             
-                            target_amount_val = amount  # 保存原始金额
+                            target_amount_val = amount
                             # 查询净值日 NAV
                             nav_info = self._get_nav_for_date(fund_code, nav_date_str)
                             if not nav_info:
-                                # 净值日净值未抓取，创建待确认记录
                                 print(f"净值日({nav_date_str})净值未抓取，创建待确认记录")
                                 self.add_transaction(
                                     fund_code=fund_code,
-                                    fund_name='',  # 后续填充
+                                    fund_name='',
                                     transaction_type=transaction_type,
                                     shares=None,
                                     unit_nav=None,
@@ -154,16 +186,16 @@ class TransactionImporter:
                                 )
                                 success_count += 1
                                 continue
+                            
                             fund_name, unit_nav = nav_info
                             if unit_nav <= 0:
                                 raise ValueError("净值无效")
-                            shares = round(amount / unit_nav, 2)
+                            shares = round(amount / unit_nav, 6)
                             amount = round(shares * unit_nav, 2)
                         else:
-                            target_amount_val = None  # 旧格式不使用 target_amount
-                            # 旧格式：transaction_date 是交易日，净值是交易日或下一交易日的净值
+                            target_amount_val = None
                             trans_dt = datetime.strptime(transaction_date, '%Y-%m-%d')
-                            # 净值日期：非交易日使用下一交易日
+                            
                             if checker.is_trading_day(trans_dt):
                                 nav_date_str = transaction_date
                             else:
@@ -218,42 +250,43 @@ class TransactionImporter:
                 print(f"{error}")
 
     def _get_nav_for_date(self, fund_code: str, transaction_date: str) -> Optional[Tuple[str, float]]:
-        """获取某基金在指定日期的 unit_nav 和 fund_name (从全局共享的历史净值表)
-        严格匹配 price_date=transaction_date，不存在则返回 None
+        """获取某基金在指定日期的 unit_nav 和 fund_name（从共享净值表）
         Returns: (fund_name, unit_nav) 或 None
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute(
-            """SELECT fund_name, unit_nav FROM fund_nav_history 
-                WHERE fund_code=? AND price_date=? 
-                ORDER BY fetched_at DESC LIMIT 1""",
-            (fund_code, transaction_date)
-        )
-        row = cursor.fetchone()
-        conn.close()
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text("""
+                    SELECT fund_name, unit_nav FROM fund_nav_history 
+                    WHERE fund_code=:fund_code AND price_date=:price_date 
+                    ORDER BY fetched_at DESC LIMIT 1
+                """),
+                {'fund_code': fund_code, 'price_date': transaction_date}
+            )
+            row = result.fetchone()
+        
         if not row:
             return None
         return row[0], float(row[1])
 
 
 # 向后兼容的函数接口
-def import_from_csv(csv_file='transactions.csv', db_path='fund.db', skip_header=True):
-    """从CSV文件导入交易记录
+def import_from_csv(csv_file='transactions.csv', db_url=None, skip_header=True, user_id=1):
+    """从CSV文件导入交易记录（PostgreSQL）
     
     Args:
         csv_file: CSV文件路径
-        db_path: 数据库路径
+        db_url: PostgreSQL数据库URL
         skip_header: 是否跳过第一行标题
+        user_id: 用户ID
     """
-    importer = TransactionImporter(db_path=db_path, csv_file=csv_file)
+    importer = TransactionImporter(db_url=db_url, csv_file=csv_file, user_id=user_id)
     importer.import_from_csv(skip_header=skip_header)
 
 
 def add_transaction(fund_code, fund_name, transaction_type, shares, unit_nav, 
                    note='', transaction_date=None, nav_date=None, target_amount=None, 
-                   db_path='fund.db'):
-    """添加单笔交易记录
+                   db_url=None, user_id=1):
+    """添加单笔交易记录（PostgreSQL）
     
     Args:
         fund_code: 基金代码
@@ -265,9 +298,9 @@ def add_transaction(fund_code, fund_name, transaction_type, shares, unit_nav,
         transaction_date: 交易日期
         nav_date: 净值日期
         target_amount: 目标金额
-        db_path: 数据库路径
+        db_url: PostgreSQL数据库URL
+        user_id: 用户ID
     """
-    importer = TransactionImporter(db_path=db_path)
+    importer = TransactionImporter(db_url=db_url, user_id=user_id)
     importer.add_transaction(fund_code, fund_name, transaction_type, shares, unit_nav, 
                             note, transaction_date, nav_date, target_amount)
-

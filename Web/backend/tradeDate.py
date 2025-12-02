@@ -1,9 +1,6 @@
 '''
-判断是否为定投交易日期的模块
-如果是且定投计划启用，则生成相应的交易记录
+判断是否为定投交易日期的模块（PostgreSQL）
 '''
-#auto_invest_setting.json
-#fund.db
 
 import json
 import os
@@ -11,10 +8,10 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 class TradeDateChecker:
-    def __init__(self, config_file='auto_invest_setting.json', db_path='fund.db'):
-        '''设置定投配置文件路径与数据库路径'''
+    def __init__(self, config_file='auto_invest_setting.json', db_url: str | None = None):
+        '''初始化交易日检查器'''
         self.config_file = config_file
-        self.db_path = db_path
+        self.db_url = db_url or os.getenv('DATABASE_URL', 'postgresql://localhost:5432/ndx')
         self.plans = self.load_plans()
         self.holidays = self._load_holidays()
 

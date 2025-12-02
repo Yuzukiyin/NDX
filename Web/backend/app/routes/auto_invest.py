@@ -25,17 +25,7 @@ async def get_auto_invest_service(
 ) -> AutoInvestService:
     """Dependency to get auto-invest service for current user"""
     user = await AuthService.get_current_user(db, credentials.credentials)
-    
-    # Parse database path
-    db_url = settings.database_url_async
-    if db_url.startswith("sqlite+aiosqlite:///"):
-        db_path = db_url.replace("sqlite+aiosqlite:///", "")
-    elif db_url.startswith("sqlite:///"):
-        db_path = db_url.replace("sqlite:///", "")
-    else:
-        db_path = "./ndx_users.db"
-    
-    return AutoInvestService(user.id, db_path)
+    return AutoInvestService(user.id)
 
 
 @router.get("/plans", response_model=List[AutoInvestPlan])

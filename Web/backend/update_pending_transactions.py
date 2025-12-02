@@ -1,10 +1,8 @@
 """
-更新待确认交易记录的脚本
+更新待确认交易记录的脚本（PostgreSQL）
 当历史净值抓取后,自动填充 shares/unit_nav/amount
 支持从定投计划配置自动提取金额
 """
-#fund.db
-#auto_invest_setting.json
 
 import os
 from datetime import datetime, timedelta
@@ -13,22 +11,38 @@ from tradeDate import TradeDateChecker
 
 
 class PendingTransactionUpdater:
-    def __init__(self, db_path='fund.db', config_file='auto_invest_setting.json', user_id=1, db_url: str | None = None):
-        self.db_path = db_path
+    def __init__(self, config_file='auto_invest_setting.json', user_id=1, db_url: str | None = None):
+        '''初始化待确认交易更新器（仅支持PostgreSQL）'''
         self.config_file = config_file
         self.user_id = user_id
-        self.db_url = self._resolve_db_url(db_url or db_path)
+        
+        # 获取数据库URL
+        if db_url:
+            self.db_url = self._resolve_db_url(db_url)
+        else:
+            self.db_url = os.getenv('DATABASE_URL', 'postgresql://localhost:5432/ndx')
+            self.db_url = self._resolve_db_url(self.db_url)
+        
         self.engine = create_engine(self.db_url, future=True)
         # 先尝试从数据库加载，失败则从配置文件加载
         self.plans = self._build_plan_map()
 
     def _resolve_db_url(self, raw: str) -> str:
+        """将数据库URL转换为同步PostgreSQL格式"""
         if not raw:
-            return 'sqlite:///fund.db'
-        if '://' in raw:
-            return raw
-        abs_path = raw if os.path.isabs(raw) else os.path.join(os.getcwd(), raw)
-        return f"sqlite:///{abs_path}"
+            return 'postgresql://localhost:5432/ndx'
+        
+        # Railway等平台可能使用postgres://前缀
+        if raw.startswith('postgres://'):
+            raw = raw.replace('postgres://', 'postgresql://', 1)
+        
+        # 确保使用psycopg2驱动（同步）
+        if raw.startswith('postgresql+asyncpg://'):
+            raw = raw.replace('postgresql+asyncpg://', 'postgresql+psycopg2://', 1)
+        elif raw.startswith('postgresql://') and '+' not in raw:
+            raw = raw.replace('postgresql://', 'postgresql+psycopg2://', 1)
+        
+        return raw
     
     def _build_plan_map(self):
         """从数据库或配置文件加载计划，构建 fund_code -> amount 映射"""
@@ -51,17 +65,8 @@ class PendingTransactionUpdater:
                     print(f"从数据库加载了 {len(plan_map)} 个启用的定投计划金额")
                     return plan_map
         except Exception as e:
-            print(f"从数据库读取计划失败，尝试配置文件: {e}")
-        
-        # 回退到配置文件
-        from tradeDate import TradeDateChecker
-        checker = TradeDateChecker(config_file=self.config_file, db_path=self.db_path)
-        for plan in checker.plans.get('plans', []):
-            fund_code = plan.get('fund_code')
-            amount = plan.get('amount')
-            if fund_code and amount:
-                plan_map[fund_code] = amount
-        return plan_map
+            print(f"从数据库读取计划失败: {e}")
+            return plan_map
     
     def get_pending_transactions(self):
         """查询当前用户所有待确认的交易记录（shares IS NULL）"""
@@ -306,15 +311,15 @@ class PendingTransactionUpdater:
 
 
 # 向后兼容的函数接口
-def process_pending_records(use_target_amount=True, auto_remove_non_trading=True, db_path='fund.db', config_file='auto_invest_setting.json', db_url: str | None = None):
-    """处理所有待确认记录
+def process_pending_records(use_target_amount=True, auto_remove_non_trading=True, db_url: str | None = None, user_id=1):
+    """处理所有待确认记录（PostgreSQL）
     
     Args:
-        use_target_amount: True=使用数据库中的target_amount，False=从配置文件获取金额
+        use_target_amount: True=使用数据库中的target_amount，False=从数据库的定投计划获取金额
         auto_remove_non_trading: True=自动检测并删除非交易日的待确认记录
-        db_path: 数据库路径
-        config_file: 配置文件路径
+        db_url: PostgreSQL数据库URL
+        user_id: 用户ID
     """
-    updater = PendingTransactionUpdater(db_path=db_path, config_file=config_file, db_url=db_url)
+    updater = PendingTransactionUpdater(db_url=db_url, user_id=user_id)
     updater.process_pending_records(use_target_amount, auto_remove_non_trading)
     

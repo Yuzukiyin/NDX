@@ -20,12 +20,8 @@ class Settings(BaseSettings):
     # Password requirements
     PASSWORD_MIN_LENGTH: int = 8
     
-    # Database - SQLite by default, PostgreSQL via env var on Railway
-    DATABASE_URL: str = "sqlite+aiosqlite:///./ndx_users.db"
-    FUND_DB_PATH: str = "./fund.db"  # Original fund database (deprecated)
-    
-    # Auto invest config file path
-    AUTO_INVEST_CONFIG_PATH: Optional[str] = None
+    # Database - PostgreSQL only
+    DATABASE_URL: str = "postgresql://localhost:5432/ndx"
 
     # Admin bootstrap (optional)
     # If provided, the app will auto-create this admin on first start
@@ -35,28 +31,25 @@ class Settings(BaseSettings):
     
     @property
     def database_url_async(self) -> str:
-        """Ensure DATABASE_URL uses async driver"""
+        """Ensure DATABASE_URL uses async driver (asyncpg for PostgreSQL)"""
         url = self.DATABASE_URL
-        # Convert SQLite to async
-        if url.startswith("sqlite:///") and "+aiosqlite" not in url:
-            url = url.replace("sqlite:///", "sqlite+aiosqlite:///")
         # Convert PostgreSQL to async (asyncpg)
-        elif url.startswith("postgresql://"):
+        if url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
         return url
 
     @property
     def database_url_sync(self) -> str:
-        """Return sync driver URL for background scripts"""
+        """Return sync driver URL for background scripts (psycopg2 for PostgreSQL)"""
         url = self.DATABASE_URL
-        if url.startswith("sqlite+aiosqlite:///"):
-            return url.replace("sqlite+aiosqlite:///", "sqlite:///", 1)
-        if url.startswith("sqlite:///"):
-            return url
         if url.startswith("postgresql+asyncpg://"):
             return url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
         if url.startswith("postgresql://"):
             return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql+psycopg2://", 1)
         return url
     
     # CORS
@@ -79,17 +72,6 @@ class Settings(BaseSettings):
     MAIL_SERVER: Optional[str] = None
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
-    
-    @property
-    def auto_invest_config_resolved(self) -> str:
-        """Get auto invest config path with fallback"""
-        import os
-        # Try environment variable first
-        if self.AUTO_INVEST_CONFIG_PATH and os.path.exists(self.AUTO_INVEST_CONFIG_PATH):
-            return self.AUTO_INVEST_CONFIG_PATH
-        # Fall back to local backend directory
-        local_path = os.path.join(os.path.dirname(__file__), '..', 'auto_invest_setting.json')
-        return os.path.abspath(local_path)
     
     class Config:
         env_file = ".env"

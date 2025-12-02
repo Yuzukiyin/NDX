@@ -1,6 +1,4 @@
-'''获取定投计划中基金历史净值的模块'''
-#auto_invest_setting.json
-#fund.db
+'''获取定投计划中基金历史净值的模块（PostgreSQL）'''
 
 import sys
 import os
@@ -11,23 +9,37 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'fundSpider'))
 from fundSpider.fund_info import FuncInfo
 
 class HistoryNavFetcher:
-    def __init__(self, config_path='auto_invest_setting.json', db_path='fund.db', data_source='fundSpider', db_url: str | None = None, user_id: int = 1):
-        '''设置默认输出目录和配置文件路径'''
-        self.config_path = config_path
+    def __init__(self, data_source='fundSpider', db_url: str | None = None, user_id: int = 1):
+        '''初始化净值抓取器（仅支持PostgreSQL）'''
         self.data_source = data_source
         self.user_id = user_id
-        self.db_url = self._resolve_db_url(db_url or db_path)
+        
+        # 获取数据库URL（仅支持PostgreSQL）
+        if db_url:
+            self.db_url = self._resolve_db_url(db_url)
+        else:
+            # 从环境变量获取
+            self.db_url = os.getenv('DATABASE_URL', 'postgresql://localhost:5432/ndx')
+            self.db_url = self._resolve_db_url(self.db_url)
+        
         self.engine = create_engine(self.db_url, future=True)
 
     def _resolve_db_url(self, raw: str) -> str:
+        """将数据库URL转换为同步PostgreSQL格式"""
         if not raw:
-            return 'sqlite:///fund.db'
-        if '://' in raw:
-            return raw
-        abs_path = raw
-        if not os.path.isabs(abs_path):
-            abs_path = os.path.join(os.getcwd(), raw)
-        return f"sqlite:///{abs_path}"
+            return 'postgresql://localhost:5432/ndx'
+        
+        # Railway等平台可能使用postgres://前缀
+        if raw.startswith('postgres://'):
+            raw = raw.replace('postgres://', 'postgresql://', 1)
+        
+        # 确保使用psycopg2驱动（同步）
+        if raw.startswith('postgresql+asyncpg://'):
+            raw = raw.replace('postgresql+asyncpg://', 'postgresql+psycopg2://', 1)
+        elif raw.startswith('postgresql://') and '+' not in raw:
+            raw = raw.replace('postgresql://', 'postgresql+psycopg2://', 1)
+        
+        return raw
 
     def load_enabled_plans(self):
         """读取启用定投计划并返回列表字典
@@ -66,41 +78,8 @@ class HistoryNavFetcher:
                     print(f"从数据库加载了 {len(results)} 个启用的定投计划")
                     return results
         except Exception as e:
-            print(f"从数据库读取计划失败，尝试读取配置文件: {e}")
-        
-        # 回退到配置文件
-        full_path = self.config_path
-        if not os.path.isabs(full_path):
-            full_path = os.path.join(os.path.dirname(__file__), self.config_path)
-        if not os.path.exists(full_path):
-            print(f"未找到配置文件: {full_path}")
+            print(f"从数据库读取计划失败: {e}")
             return []
-        try:
-            with open(full_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except Exception as e:
-            print(f"读取配置文件失败: {e}")
-            return []
-        raw_plans = data.get('plans', [])
-        results = []
-        for p in raw_plans:
-            if not p.get('enabled'):
-                continue
-            if not p.get('fund_code') or not p.get('fund_name'):
-                continue
-            results.append({
-                'plan_name': p.get('plan_name',''),
-                'fund_code': p['fund_code'],
-                'fund_name': p['fund_name'],
-                'amount': p.get('amount', 0.0),
-                'frequency': p.get('frequency',''),
-                'start_date': p.get('start_date') or (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'),
-                'end_date': p.get('end_date') or '2099-12-31',
-                'enabled': True
-            })
-        if not results:
-            print("配置文件中没有启用的计划")
-        return results
 
     def fetch_fund_history(self, fund_code, fund_name, start_date, end_date):
         """
@@ -364,19 +343,19 @@ class HistoryNavFetcher:
 
 
 def fetch_nav_history(start_date_override=None, end_date_override=None, 
-                     config_path='auto_invest_setting.json', db_path='fund.db', data_source='fundSpider'):
-    """批量导入启用计划的历史净值
+                     db_url=None, data_source='fundSpider', user_id=1):
+    """批量导入启用计划的历史净值（PostgreSQL）
     
     Args:
         start_date_override: 可选覆盖的开始日期 (字符串 'YYYY-MM-DD'，留空则从基金成立日起)
         end_date_override: 可选覆盖的结束日期 (字符串 'YYYY-MM-DD'，留空则到今天)
-        config_path: 配置文件路径
-        db_path: 数据库路径
+        db_url: PostgreSQL数据库URL
         data_source: 数据源标识
+        user_id: 用户ID
     
     Returns:
         List[Dict]: 每个计划的导入结果明细
     """
-    fetcher = HistoryNavFetcher(config_path=config_path, db_path=db_path, data_source=data_source)
+    fetcher = HistoryNavFetcher(db_url=db_url, data_source=data_source, user_id=user_id)
     return fetcher.import_enabled_plans(start_date_override, end_date_override)
 

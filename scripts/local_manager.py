@@ -40,14 +40,14 @@ def main():
         elif choice == '1':
             print("\n开始抓取历史净值...")
             try:
-                fetch_nav_history(db_path=db_url)
+                fetch_nav_history(db_url=db_url)
                 print("✓ 历史净值抓取完成")
             except Exception as e:
                 print(f"✗ 抓取失败: {e}")
         elif choice == '2':
             csv_file = input("请输入CSV文件路径 (默认: transactions.csv): ").strip() or 'transactions.csv'
             try:
-                import_from_csv(csv_file=csv_file, db_path=db_url)
+                import_from_csv(csv_file=csv_file, db_url=db_url, user_id=1)
                 print("✓ 交易记录导入完成")
             except Exception as e:
                 print(f"✗ 导入失败: {e}")

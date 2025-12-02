@@ -31,39 +31,25 @@ async def get_db():
 
 
 async def init_db():
-    """初始化数据库表"""
+    """初始化数据库表（仅支持PostgreSQL）"""
     from ..models.user import Base
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # 基金相关表初始化（支持 SQLite / PostgreSQL）
+        # 基金相关表初始化（PostgreSQL）
         try:
-            db_url = settings.database_url_async.lower()
+            from sqlalchemy import create_engine
+            sync_engine = create_engine(settings.database_url_sync, future=True)
             schema_dir = Path(__file__).parent.parent / 'db'
-            if 'sqlite' in db_url:
-                res = await conn.exec_driver_sql(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='fund_overview'"
-                )
-                if res.fetchone() is None:
-                    schema_path = schema_dir / 'fund_multitenant.sql'
-                    sql = schema_path.read_text(encoding='utf-8')
-                    await conn.exec_driver_sql(sql)
-                    print("✅ Fund schema initialized (SQLite)")
-            elif 'postgresql' in db_url:
-                # PostgreSQL 使用同步连接执行 schema（避免 asyncpg 的多语句限制）
-                from sqlalchemy import create_engine
-                sync_engine = create_engine(settings.database_url_sync, future=True)
-                schema_path = schema_dir / 'fund_multitenant_postgres.sql'
-                sql = schema_path.read_text(encoding='utf-8')
-                
-                with sync_engine.connect() as sync_conn:
-                    # 使用 psycopg2 的 raw connection 执行多语句 SQL
-                    raw_conn = sync_conn.connection
-                    cursor = raw_conn.cursor()
-                    cursor.execute(sql)
-                    raw_conn.commit()
-                    cursor.close()
-                print("✅ Fund schema initialized (PostgreSQL)")
-            else:
-                print("⚠️ Unsupported database for fund schema initialization")
+            schema_path = schema_dir / 'fund_multitenant_postgres.sql'
+            sql = schema_path.read_text(encoding='utf-8')
+            
+            with sync_engine.connect() as sync_conn:
+                # 使用 psycopg2 的 raw connection 执行多语句 SQL
+                raw_conn = sync_conn.connection
+                cursor = raw_conn.cursor()
+                cursor.execute(sql)
+                raw_conn.commit()
+                cursor.close()
+            print("✅ Fund schema initialized (PostgreSQL)")
         except Exception as e:
             print(f"⚠️ Fund schema init error: {e}")

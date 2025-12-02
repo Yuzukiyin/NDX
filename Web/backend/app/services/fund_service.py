@@ -137,9 +137,7 @@ class FundService:
 
             from fetch_history_nav import HistoryNavFetcher
 
-            config_path = settings.auto_invest_config_resolved
             fetcher = HistoryNavFetcher(
-                config_path=config_path,
                 db_url=settings.database_url_sync,
                 data_source='fundSpider',
                 user_id=self.user_id,
@@ -166,12 +164,9 @@ class FundService:
 
             from update_pending_transactions import PendingTransactionUpdater
 
-            config_path = settings.auto_invest_config_resolved
             updater = PendingTransactionUpdater(
-                db_path=settings.FUND_DB_PATH,
-                config_file=config_path,
-                user_id=self.user_id,
                 db_url=settings.database_url_sync,
+                user_id=self.user_id,
             )
             return await asyncio.to_thread(
                 updater.process_pending_records,
