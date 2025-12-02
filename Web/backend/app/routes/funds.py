@@ -134,11 +134,16 @@ async def initialize_database(
 
 @router.post("/fetch-nav")
 async def fetch_nav(
+    force_recent_days: int = 0,
     fund_service: FundService = Depends(get_current_fund_service)
 ):
-    """Fetch historical NAV data for all enabled plans"""
+    """Fetch historical NAV data for all enabled plans
+    
+    Args:
+        force_recent_days: 强制重新抓取最近N天净值（0=仅抓缺失，7=强制抓最近7天）
+    """
     try:
-        details = await fund_service.fetch_history_nav(fund_codes=None)
+        details = await fund_service.fetch_history_nav(fund_codes=None, force_recent_days=force_recent_days)
         return {"message": "历史净值抓取完成", "details": details}
     except Exception as e:
         raise HTTPException(

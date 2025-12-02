@@ -120,9 +120,16 @@ class FundService:
         """PostgreSQL 由 init_db 自动创建结构，此处保留占位"""
         return {"message": "PostgreSQL schema is managed automatically"}
 
-    async def fetch_history_nav(self, fund_codes: Optional[List[str]] = None):
+    async def fetch_history_nav(self, fund_codes: Optional[List[str]] = None, force_recent_days: int = 0):
+        """抓取历史净值
+        
+        Args:
+            fund_codes: 指定基金代码列表（暂未使用）
+            force_recent_days: 强制重新抓取最近 N 天的净值（0=仅抓取缺失日期，7=强制抓最近7天）
+        """
         try:
             import sys
+            from datetime import datetime, timedelta
             backend_dir = Path(__file__).parent.parent.parent
             if str(backend_dir) not in sys.path:
                 sys.path.insert(0, str(backend_dir))
@@ -136,8 +143,13 @@ class FundService:
                 data_source='fundSpider',
             )
 
+            # 如果设置了强制抓取最近 N 天，计算起始日期
+            start_override = None
+            if force_recent_days > 0:
+                start_override = (datetime.now() - timedelta(days=force_recent_days)).strftime('%Y-%m-%d')
+
             # 运行阻塞任务到线程池，避免阻塞事件循环
-            return await asyncio.to_thread(fetcher.import_enabled_plans)
+            return await asyncio.to_thread(fetcher.import_enabled_plans, start_override, None)
         except ImportError as e:
             raise Exception(f"无法导入历史净值模块: {e}")
         except Exception as e:
