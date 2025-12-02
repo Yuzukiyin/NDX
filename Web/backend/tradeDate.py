@@ -2,25 +2,74 @@
 判断是否为定投交易日期的模块（PostgreSQL）
 '''
 
-import json
 import os
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import create_engine, text
 
 class TradeDateChecker:
-    def __init__(self, config_file='auto_invest_setting.json', db_url: str | None = None):
-        '''初始化交易日检查器'''
-        self.config_file = config_file
-        self.db_url = db_url or os.getenv('DATABASE_URL', 'postgresql://localhost:5432/ndx')
+    def __init__(self, user_id: int = 1, db_url: str | None = None):
+        '''初始化交易日检查器（仅支持PostgreSQL）'''
+        self.user_id = user_id
+        
+        # 获取数据库URL
+        if db_url:
+            self.db_url = self._resolve_db_url(db_url)
+        else:
+            self.db_url = os.getenv('DATABASE_URL', 'postgresql://localhost:5432/ndx')
+            self.db_url = self._resolve_db_url(self.db_url)
+        
+        self.engine = create_engine(self.db_url, future=True)
         self.plans = self.load_plans()
         self.holidays = self._load_holidays()
 
+    def _resolve_db_url(self, raw: str) -> str:
+        """将数据库URL转换为同步PostgreSQL格式"""
+        if not raw:
+            return 'postgresql://localhost:5432/ndx'
+        
+        # Railway等平台可能使用postgres://前缀
+        if raw.startswith('postgres://'):
+            raw = raw.replace('postgres://', 'postgresql://', 1)
+        
+        # 确保使用psycopg2驱动（同步）
+        if raw.startswith('postgresql+asyncpg://'):
+            raw = raw.replace('postgresql+asyncpg://', 'postgresql+psycopg2://', 1)
+        elif raw.startswith('postgresql://') and '+' not in raw:
+            raw = raw.replace('postgresql://', 'postgresql+psycopg2://', 1)
+        
+        return raw
+
     def load_plans(self):
-        '''加载定投计划'''
-        if os.path.exists(self.config_file):
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        return {"plans": []}
+        '''从数据库加载启用的定投计划（仅PostgreSQL）'''
+        try:
+            with self.engine.connect() as conn:
+                result = conn.execute(
+                    text("""
+                        SELECT plan_name, fund_code, fund_name, amount, frequency, 
+                               start_date::text, end_date::text
+                        FROM auto_invest_plans
+                        WHERE user_id = :user_id AND enabled = true
+                    """),
+                    {"user_id": self.user_id}
+                )
+                rows = result.fetchall()
+                plans = []
+                for row in rows:
+                    plans.append({
+                        'plan_name': row[0],
+                        'fund_code': row[1],
+                        'fund_name': row[2],
+                        'amount': float(row[3]),
+                        'frequency': row[4],
+                        'start_date': row[5],
+                        'end_date': row[6]
+                    })
+                print(f"从数据库加载了 {len(plans)} 个启用的定投计划")
+                return {"plans": plans}
+        except Exception as e:
+            print(f"从数据库读取计划失败: {e}")
+            return {"plans": []}
 
     def _load_holidays(self):
         '''导入2024-2026年中国法定节假日'''

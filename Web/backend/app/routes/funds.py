@@ -144,7 +144,25 @@ async def fetch_nav(
     """
     try:
         details = await fund_service.fetch_history_nav(fund_codes=None, force_recent_days=force_recent_days)
-        return {"message": "历史净值抓取完成", "details": details}
+        
+        if not details:
+            return {
+                "message": "没有启用的定投计划需要抓取",
+                "success": False,
+                "details": []
+            }
+        
+        success_count = sum(1 for d in details if d.get('success', False))
+        total_rows = sum(d.get('rows_written', 0) for d in details)
+        
+        return {
+            "message": f"抓取完成: 成功 {success_count}/{len(details)} 个基金，共导入 {total_rows} 条记录",
+            "success": success_count > 0,
+            "total_plans": len(details),
+            "success_count": success_count,
+            "total_rows_written": total_rows,
+            "details": details
+        }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -158,8 +176,24 @@ async def update_pending(
 ):
     """Update pending transactions"""
     try:
-        await fund_service.update_pending_transactions()
-        return {"message": "待确认交易更新完成"}
+        result = await fund_service.update_pending_transactions()
+        
+        # update_pending_transactions现在返回处理结果字典
+        if result:
+            return {
+                "message": result.get('message', '待确认交易更新完成'),
+                "success": result.get('success', True),
+                "pending_count": result.get('pending_count', 0),
+                "success_count": result.get('success_count', 0),
+                "skip_count": result.get('skip_count', 0),
+                "deleted_count": result.get('deleted_count', 0)
+            }
+        else:
+            return {
+                "message": "没有待确认的交易记录",
+                "success": False,
+                "pending_count": 0
+            }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

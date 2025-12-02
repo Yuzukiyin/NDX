@@ -1,7 +1,7 @@
 """
 更新待确认交易记录的脚本（PostgreSQL）
 当历史净值抓取后,自动填充 shares/unit_nav/amount
-支持从定投计划配置自动提取金额
+从数据库的定投计划表(auto_invest_plans)获取金额配置
 """
 
 import os
@@ -11,9 +11,8 @@ from tradeDate import TradeDateChecker
 
 
 class PendingTransactionUpdater:
-    def __init__(self, config_file='auto_invest_setting.json', user_id=1, db_url: str | None = None):
+    def __init__(self, user_id=1, db_url: str | None = None):
         '''初始化待确认交易更新器（仅支持PostgreSQL）'''
-        self.config_file = config_file
         self.user_id = user_id
         
         # 获取数据库URL
@@ -45,10 +44,10 @@ class PendingTransactionUpdater:
         return raw
     
     def _build_plan_map(self):
-        """从数据库或配置文件加载计划，构建 fund_code -> amount 映射"""
+        """从数据库加载启用的定投计划，构建 fund_code -> amount 映射（仅PostgreSQL）"""
         plan_map = {}
         
-        # 优先从数据库读取
+        # 从数据库读取定投计划
         try:
             with self.engine.connect() as conn:
                 result = conn.execute(
@@ -125,6 +124,9 @@ class PendingTransactionUpdater:
         自动检测并清理所有非交易日的待确认记录
         
         检查逻辑：遍历所有待确认记录的nav_date，如果该日期无净值但次日有净值，判定为非交易日并删除
+        
+        Returns:
+            int: 删除的记录数量
         """
         # 将所有数据库操作放在一个事务内
         with self.engine.begin() as conn:
@@ -214,6 +216,8 @@ class PendingTransactionUpdater:
                 print(f"\n共删除 {total_deleted} 条非交易日待确认记录")
             else:
                 print("未发现非交易日待确认记录")
+            
+            return total_deleted
 
     def process_pending_records(self, use_target_amount=True, auto_remove_non_trading=True):
         """
@@ -222,25 +226,44 @@ class PendingTransactionUpdater:
         Args:
             use_target_amount: True=使用数据库中的target_amount，False=从配置文件获取金额
             auto_remove_non_trading: True=自动检测并删除非交易日的待确认记录
+        
+        Returns:
+            dict: 包含处理结果的字典
         """
         pending = self.get_pending_transactions()
+        initial_count = len(pending)
+        deleted_count = 0
         
         if not pending:
             print("没有待确认的交易记录")
-            return
+            return {
+                "success": False,
+                "message": "没有待确认的交易记录",
+                "pending_count": 0,
+                "success_count": 0,
+                "skip_count": 0,
+                "deleted_count": 0
+            }
         
         print(f"找到 {len(pending)} 条待确认记录\n")
         
         # 自动清理非交易日记录
         if auto_remove_non_trading:
-            self._auto_clean_non_trading_days()
+            deleted_count = self._auto_clean_non_trading_days()
             print()
             
             # 重新获取待确认记录
             pending = self.get_pending_transactions()
             if not pending:
                 print("清理后没有待确认的交易记录")
-                return
+                return {
+                    "success": True,
+                    "message": f"清理了 {deleted_count} 条非交易日记录，无待确认记录需要更新",
+                    "pending_count": initial_count,
+                    "success_count": 0,
+                    "skip_count": 0,
+                    "deleted_count": deleted_count
+                }
             print(f"清理后剩余 {len(pending)} 条待确认记录\n")
         
         success_count = 0
@@ -294,6 +317,16 @@ class PendingTransactionUpdater:
         print("=" * 50)
         print(f"更新完成: 成功 {success_count} 条，跳过 {skip_count} 条")
         print("=" * 50)
+        
+        # 返回详细结果
+        return {
+            "success": success_count > 0 or deleted_count > 0,
+            "message": f"成功更新 {success_count} 条，跳过 {skip_count} 条，删除非交易日 {deleted_count} 条",
+            "pending_count": initial_count,
+            "success_count": success_count,
+            "skip_count": skip_count,
+            "deleted_count": deleted_count
+        }
 
     def _get_nav_for_date(self, fund_code: str, nav_date: str):
         with self.engine.connect() as conn:

@@ -42,14 +42,14 @@ class HistoryNavFetcher:
         return raw
 
     def load_enabled_plans(self):
-        """读取启用定投计划并返回列表字典
+        """从数据库读取启用的定投计划并返回列表字典
         
-        优先从数据库 auto_invest_plans 表读取，如果失败则回退到配置文件
+        从 auto_invest_plans 表读取当前用户的定投计划（仅PostgreSQL）
         
         字段: plan_name, fund_code, fund_name, amount, frequency, start_date, end_date, enabled
-        仅保留 enabled=true 且关键字段存在的计划
+        仅保留 enabled=true 的计划
         """
-        # 尝试从数据库读取
+        # 从数据库读取定投计划
         try:
             with self.engine.connect() as conn:
                 result = conn.execute(
