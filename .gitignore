@@ -51,15 +51,14 @@ Thumbs.db
 *.swp
 *~
 
-# Export files (generated data, 保留配置文件)
+# Export files (generated data)
 transactions*.csv
 *_export.json
 *_export.csv
 nav_*.json
 bought.sql
 
-# 保留这些JSON配置文件
-!auto_invest_setting.json
+# Keep these JSON config files
 !package.json
 !package-lock.json
 !tsconfig.json
