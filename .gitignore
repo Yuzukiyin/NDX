@@ -1,19 +1,111 @@
-__pycache__
-.vscode
-venv
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.py[cod]
+*$py.class
 
-# Database files
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
 
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
+# Environment variables
+.env
+.env.local
+.env.*.local
 
-# CSV data files
-transactions.csv
-transactions_new.csv
-transactions_old.csv
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+fund.db
+ndx_users.db
 
-# Config files with sensitive data
-auto_invest_setting.json
+# Logs
+*.log
+logs/
 
-# Export files
-nav_history_export.json
-transactions_export.json
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Export files (generated data, 保留配置文件)
+transactions*.csv
+*_export.json
+*_export.csv
+nav_*.json
+bought.sql
+
+# 保留这些JSON配置文件
+!auto_invest_setting.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.node.json
+!vercel.json
+!railway.json
+!postcss.config.js
+!tailwind.config.js
+!vite.config.ts
+
+# SQL dumps (保留数据库schema)
+*.sql
+!**/db/*.sql
+
+# Frontend
+node_modules/
+.cache/
+dist/
+.next/
+out/
+build/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Railway
+.railway/
+
+# Vercel
+.vercel/
+
+# 旧的开发文件（已移至scripts/）
+AAAfund_manager.py
+check_db.py
+check_fund_db.py
+export_fund_data.py
+nav_plot.py
+upload_to_railway.py
+
+# 重复文件（Web/backend已有）
+fetch_history_nav.py
+import_transactions.py
+import_auto_invest.py
+init_database.py
+tradeDate.py
+update_pending_transactions.py
