@@ -152,17 +152,29 @@ class HistoryNavFetcher:
         return latest
 
     def save_nav_history(self, df, fund_code, fund_name):
-        """将 DataFrame 写入 fund_nav_history (fund.db)，跳过已存在的日期"""
+        """将 DataFrame 写入 fund_nav_history，跳过已存在的日期"""
         if df is None or df.empty:
             print(f"{fund_code} 没有可写入的净值数据")
             return 0
+        
+        # 一次性查询所有已存在的日期，避免每行都查询数据库
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text("""
+                    SELECT price_date FROM fund_nav_history
+                    WHERE fund_code = :fund_code AND data_source = :source
+                """),
+                {"fund_code": fund_code, "source": self.data_source}
+            )
+            existing_dates = {row[0] for row in result.fetchall()}
+        
         records = []
         skipped_count = 0
         for _, row in df.iterrows():
             price_date = row.get('净值日期')
             
             # 检查该日期数据是否已存在
-            if self.check_nav_exists(fund_code, price_date):
+            if price_date in existing_dates:
                 skipped_count += 1
                 continue
             

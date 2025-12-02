@@ -98,6 +98,7 @@ class PendingTransactionUpdater:
         
         检查逻辑：遍历所有待确认记录的nav_date，如果该日期无净值但次日有净值，判定为非交易日并删除
         """
+        # 将所有数据库操作放在一个事务内
         with self.engine.begin() as conn:
             pending_dates = [
                 row[0]
@@ -110,82 +111,81 @@ class PendingTransactionUpdater:
                     {"user_id": self.user_id},
                 ).fetchall()
             ]
-        
-        if not pending_dates:
-            print("没有待确认记录需要检查")
-            conn.close()
-            return
-        
-        print(f"检查 {len(pending_dates)} 个不同日期: {', '.join(pending_dates)}\n")
-        
-        total_deleted = 0
-        
-        for check_date in pending_dates:
-            check_dt = datetime.strptime(check_date, '%Y-%m-%d')
-            next_day = (check_dt + timedelta(days=1)).strftime('%Y-%m-%d')
             
-            # 获取该日期的待确认基金代码
-            affected_funds = [
-                row[0]
-                for row in conn.execute(
-                    text(
-                        """SELECT DISTINCT fund_code FROM transactions
-                             WHERE user_id = :user_id AND nav_date = :nav_date AND shares IS NULL"""
-                    ),
-                    {"user_id": self.user_id, "nav_date": check_date},
-                ).fetchall()
-            ]
+            if not pending_dates:
+                print("没有待确认记录需要检查")
+                return
             
-            # 检查每个基金是否符合非交易日条件
-            non_trading_funds = []
+            print(f"检查 {len(pending_dates)} 个不同日期: {', '.join(pending_dates)}\n")
             
-            for fund_code in affected_funds:
-                # 检查check_date是否有净值
-                count_check = conn.execute(
-                    text(
-                        """SELECT COUNT(*) FROM fund_nav_history
-                             WHERE fund_code = :fund_code AND price_date = :price_date"""
-                    ),
-                    {"fund_code": fund_code, "price_date": check_date},
-                ).scalar() or 0
+            total_deleted = 0
+            
+            for check_date in pending_dates:
+                check_dt = datetime.strptime(check_date, '%Y-%m-%d')
+                next_day = (check_dt + timedelta(days=1)).strftime('%Y-%m-%d')
                 
-                # 检查next_day是否有净值
-                count_next = conn.execute(
-                    text(
-                        """SELECT COUNT(*) FROM fund_nav_history
-                             WHERE fund_code = :fund_code AND price_date = :price_date"""
-                    ),
-                    {"fund_code": fund_code, "price_date": next_day},
-                ).scalar() or 0
-                
-                if count_check == 0 and count_next > 0:
-                    non_trading_funds.append(fund_code)
-            
-            # 删除非交易日的待确认记录
-            if non_trading_funds:
-                print(f"  {check_date}: 检测到非交易日 (基金: {', '.join(non_trading_funds)})")
-                
-                for fund_code in non_trading_funds:
-                    to_delete = conn.execute(
+                # 获取该日期的待确认基金代码
+                affected_funds = [
+                    row[0]
+                    for row in conn.execute(
                         text(
-                            """SELECT transaction_id, transaction_date, note FROM transactions
-                                 WHERE user_id = :user_id AND fund_code = :fund_code AND nav_date = :nav_date AND shares IS NULL"""
+                            """SELECT DISTINCT fund_code FROM transactions
+                                 WHERE user_id = :user_id AND nav_date = :nav_date AND shares IS NULL"""
                         ),
-                        {"user_id": self.user_id, "fund_code": fund_code, "nav_date": check_date},
+                        {"user_id": self.user_id, "nav_date": check_date},
                     ).fetchall()
+                ]
+                
+                # 检查每个基金是否符合非交易日条件
+                non_trading_funds = []
+                
+                for fund_code in affected_funds:
+                    # 检查check_date是否有净值
+                    count_check = conn.execute(
+                        text(
+                            """SELECT COUNT(*) FROM fund_nav_history
+                                 WHERE fund_code = :fund_code AND price_date = :price_date"""
+                        ),
+                        {"fund_code": fund_code, "price_date": check_date},
+                    ).scalar() or 0
+                    
+                    # 检查next_day是否有净值
+                    count_next = conn.execute(
+                        text(
+                            """SELECT COUNT(*) FROM fund_nav_history
+                                 WHERE fund_code = :fund_code AND price_date = :price_date"""
+                        ),
+                        {"fund_code": fund_code, "price_date": next_day},
+                    ).scalar() or 0
+                    
+                    if count_check == 0 and count_next > 0:
+                        non_trading_funds.append(fund_code)
+                
+                # 删除非交易日的待确认记录
+                if non_trading_funds:
+                    print(f"  {check_date}: 检测到非交易日 (基金: {', '.join(non_trading_funds)})")
+                    
+                    for fund_code in non_trading_funds:
+                        to_delete = conn.execute(
+                            text(
+                                """SELECT transaction_id, transaction_date, note FROM transactions
+                                     WHERE user_id = :user_id AND fund_code = :fund_code AND nav_date = :nav_date AND shares IS NULL"""
+                            ),
+                            {"user_id": self.user_id, "fund_code": fund_code, "nav_date": check_date},
+                        ).fetchall()
 
-                    for tx_id, trans_date, note in to_delete:
-                        print(f"    删除: ID={tx_id} {fund_code} 交易日={trans_date}")
-                        conn.execute(
-                            text("DELETE FROM transactions WHERE transaction_id = :transaction_id"),
-                            {"transaction_id": tx_id},
-                        )
-                        total_deleted += 1
-        
-        if total_deleted > 0:
-            print(f"\n共删除 {total_deleted} 条非交易日待确认记录")
-        else:
-            print("未发现非交易日待确认记录")
+                        for tx_id, trans_date, note in to_delete:
+                            print(f"    删除: ID={tx_id} {fund_code} 交易日={trans_date}")
+                            conn.execute(
+                                text("DELETE FROM transactions WHERE transaction_id = :transaction_id"),
+                                {"transaction_id": tx_id},
+                            )
+                            total_deleted += 1
+            
+            if total_deleted > 0:
+                print(f"\n共删除 {total_deleted} 条非交易日待确认记录")
+            else:
+                print("未发现非交易日待确认记录")
 
     def process_pending_records(self, use_target_amount=True, auto_remove_non_trading=True):
         """
