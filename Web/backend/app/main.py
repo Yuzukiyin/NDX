@@ -1,10 +1,16 @@
 """Main FastAPI application"""
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+import traceback
+import logging
 from .config import settings
 from .utils.database import init_db, async_session_factory
 from .routes import auth, funds, auto_invest
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager
@@ -87,3 +93,25 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """全局异常处理器 - 返回详细错误信息用于调试"""
+    error_detail = {
+        "error": str(exc),
+        "type": type(exc).__name__,
+        "path": str(request.url),
+    }
+    
+    # 记录完整的错误堆栈到日志
+    logging.error(f"❌ Unhandled exception at {request.url}: {exc}", exc_info=True)
+    
+    # 在开发环境返回完整堆栈
+    if settings.DEBUG:
+        error_detail["traceback"] = traceback.format_exc()
+    
+    return JSONResponse(
+        status_code=500,
+        content={"detail": error_detail}
+    )
