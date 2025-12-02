@@ -53,6 +53,26 @@ CREATE TABLE IF NOT EXISTS fund_nav_history (
 CREATE INDEX IF NOT EXISTS idx_fund_nav_history_code_date
 ON fund_nav_history(fund_code, price_date);
 
+-- Auto-invest plans table
+CREATE TABLE IF NOT EXISTS auto_invest_plans (
+    plan_id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    plan_name TEXT NOT NULL,
+    fund_code TEXT NOT NULL,
+    fund_name TEXT NOT NULL,
+    amount NUMERIC(20,2) NOT NULL CHECK(amount > 0),
+    frequency TEXT NOT NULL CHECK(frequency IN ('daily','weekly','monthly')),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, plan_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_auto_invest_user
+ON auto_invest_plans(user_id, enabled);
+
 -- Trigger functions
 CREATE OR REPLACE FUNCTION trg_fund_overview_after_insert()
 RETURNS TRIGGER AS $$

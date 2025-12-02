@@ -20,7 +20,9 @@ class AutoInvestService:
         with self.Session() as session:
             result = session.execute(
                 text("""
-                    SELECT * FROM auto_invest_plans 
+                    SELECT plan_id, user_id, plan_name, fund_code, fund_name, amount::float,
+                           frequency, start_date::text, end_date::text, enabled, created_at
+                    FROM auto_invest_plans 
                     WHERE user_id = :user_id 
                     ORDER BY enabled DESC, created_at DESC
                 """),
@@ -34,7 +36,9 @@ class AutoInvestService:
         with self.Session() as session:
             result = session.execute(
                 text("""
-                    SELECT * FROM auto_invest_plans 
+                    SELECT plan_id, user_id, plan_name, fund_code, fund_name, amount::float,
+                           frequency, start_date::text, end_date::text, enabled, created_at
+                    FROM auto_invest_plans 
                     WHERE user_id = :user_id AND plan_id = :plan_id
                 """),
                 {"user_id": self.user_id, "plan_id": plan_id}

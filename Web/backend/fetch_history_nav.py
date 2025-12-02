@@ -11,10 +11,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'fundSpider'))
 from fundSpider.fund_info import FuncInfo
 
 class HistoryNavFetcher:
-    def __init__(self, config_path='auto_invest_setting.json', db_path='fund.db', data_source='fundSpider', db_url: str | None = None):
+    def __init__(self, config_path='auto_invest_setting.json', db_path='fund.db', data_source='fundSpider', db_url: str | None = None, user_id: int = 1):
         '''设置默认输出目录和配置文件路径'''
         self.config_path = config_path
         self.data_source = data_source
+        self.user_id = user_id
         self.db_url = self._resolve_db_url(db_url or db_path)
         self.engine = create_engine(self.db_url, future=True)
 
@@ -30,10 +31,44 @@ class HistoryNavFetcher:
 
     def load_enabled_plans(self):
         """读取启用定投计划并返回列表字典
-
+        
+        优先从数据库 auto_invest_plans 表读取，如果失败则回退到配置文件
+        
         字段: plan_name, fund_code, fund_name, amount, frequency, start_date, end_date, enabled
         仅保留 enabled=true 且关键字段存在的计划
         """
+        # 尝试从数据库读取
+        try:
+            with self.engine.connect() as conn:
+                result = conn.execute(
+                    text("""
+                        SELECT plan_name, fund_code, fund_name, amount, frequency, 
+                               start_date::text, end_date::text, enabled
+                        FROM auto_invest_plans
+                        WHERE user_id = :user_id AND enabled = true
+                    """),
+                    {"user_id": self.user_id}
+                )
+                rows = result.fetchall()
+                if rows:
+                    results = []
+                    for row in rows:
+                        results.append({
+                            'plan_name': row[0],
+                            'fund_code': row[1],
+                            'fund_name': row[2],
+                            'amount': float(row[3]),
+                            'frequency': row[4],
+                            'start_date': row[5],  # 已经是字符串
+                            'end_date': row[6],    # 已经是字符串
+                            'enabled': bool(row[7])
+                        })
+                    print(f"从数据库加载了 {len(results)} 个启用的定投计划")
+                    return results
+        except Exception as e:
+            print(f"从数据库读取计划失败，尝试读取配置文件: {e}")
+        
+        # 回退到配置文件
         full_path = self.config_path
         if not os.path.isabs(full_path):
             full_path = os.path.join(os.path.dirname(__file__), self.config_path)

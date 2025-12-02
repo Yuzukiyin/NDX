@@ -142,6 +142,7 @@ class FundService:
                 config_path=config_path,
                 db_url=settings.database_url_sync,
                 data_source='fundSpider',
+                user_id=self.user_id,
             )
 
             # 如果设置了强制抓取最近 N 天，计算起始日期

@@ -17,10 +17,10 @@ class PendingTransactionUpdater:
         self.db_path = db_path
         self.config_file = config_file
         self.user_id = user_id
-        self.checker = TradeDateChecker(config_file=config_file, db_path=db_path)
-        self.plans = self._build_plan_map()
         self.db_url = self._resolve_db_url(db_url or db_path)
         self.engine = create_engine(self.db_url, future=True)
+        # 先尝试从数据库加载，失败则从配置文件加载
+        self.plans = self._build_plan_map()
 
     def _resolve_db_url(self, raw: str) -> str:
         if not raw:
@@ -31,9 +31,32 @@ class PendingTransactionUpdater:
         return f"sqlite:///{abs_path}"
     
     def _build_plan_map(self):
-        """从 TradeDateChecker 加载的计划构建 fund_code -> amount 映射"""
+        """从数据库或配置文件加载计划，构建 fund_code -> amount 映射"""
         plan_map = {}
-        for plan in self.checker.plans.get('plans', []):
+        
+        # 优先从数据库读取
+        try:
+            with self.engine.connect() as conn:
+                result = conn.execute(
+                    text("""
+                        SELECT fund_code, amount FROM auto_invest_plans
+                        WHERE user_id = :user_id AND enabled = true
+                    """),
+                    {"user_id": self.user_id}
+                )
+                rows = result.fetchall()
+                if rows:
+                    for row in rows:
+                        plan_map[row[0]] = float(row[1])
+                    print(f"从数据库加载了 {len(plan_map)} 个启用的定投计划金额")
+                    return plan_map
+        except Exception as e:
+            print(f"从数据库读取计划失败，尝试配置文件: {e}")
+        
+        # 回退到配置文件
+        from tradeDate import TradeDateChecker
+        checker = TradeDateChecker(config_file=self.config_file, db_path=self.db_path)
+        for plan in checker.plans.get('plans', []):
             fund_code = plan.get('fund_code')
             amount = plan.get('amount')
             if fund_code and amount:

@@ -140,6 +140,9 @@ async def execute_today_plans(
 ):
     """Execute auto-invest plans for today"""
     try:
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.orm import sessionmaker
+        
         # Get today's date
         today = datetime.now().strftime('%Y-%m-%d')
         today_dt = datetime.now()
@@ -149,16 +152,6 @@ async def execute_today_plans(
         if is_weekend:
             return {"message": f"{today} 是周末，非交易日", "transactions_created": 0}
         
-        # Get database path
-        db_url = settings.database_url_async
-        if db_url.startswith("sqlite+aiosqlite:///"):
-            db_path = db_url.replace("sqlite+aiosqlite:///", "")
-        elif db_url.startswith("sqlite:///"):
-            db_path = db_url.replace("sqlite:///", "")
-        else:
-            db_path = "./ndx_users.db"
-        
-        print(f"[DEBUG] 数据库路径: {db_path}")
         print(f"[DEBUG] 用户ID: {service.user_id}")
         
         # Get all enabled plans from database
@@ -170,73 +163,81 @@ async def execute_today_plans(
         if not enabled_plans:
             return {"message": "没有启用的定投计划", "transactions_created": 0}
         
-        # Generate transactions for enabled plans
-        import sqlite3
+        # Use PostgreSQL connection for transaction creation
+        engine = create_engine(settings.database_url_sync, future=True)
+        Session = sessionmaker(bind=engine)
+        
         transactions_created = 0
         
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
+        with Session() as session:
+            with session.begin():
+                for plan in enabled_plans:
+                    print(f"[DEBUG] 处理计划: {plan.plan_name}")
+                    
+                    # Check if plan should execute today based on frequency
+                    start_date = datetime.strptime(plan.start_date, '%Y-%m-%d')
+                    end_date = datetime.strptime(plan.end_date, '%Y-%m-%d')
+                    
+                    if not (start_date <= today_dt <= end_date):
+                        print(f"[DEBUG] 跳过: 不在日期范围内")
+                        continue
+                    
+                    should_execute = False
+                    if plan.frequency == 'daily':
+                        should_execute = True
+                    elif plan.frequency == 'weekly':
+                        should_execute = (today_dt.weekday() == start_date.weekday())
+                    elif plan.frequency == 'monthly':
+                        should_execute = (today_dt.day == start_date.day)
+                    
+                    print(f"[DEBUG] 是否应执行: {should_execute}")
+                    
+                    if should_execute:
+                        # Calculate T+1 confirm date (next weekday)
+                        confirm_dt = today_dt + timedelta(days=1)
+                        while confirm_dt.weekday() >= 5:
+                            confirm_dt += timedelta(days=1)
+                        confirm_date = confirm_dt.strftime('%Y-%m-%d')
+                        
+                        # Check if transaction already exists
+                        result = session.execute(
+                            text("""
+                                SELECT COUNT(*) FROM transactions
+                                WHERE user_id = :user_id AND fund_code = :fund_code AND transaction_date = :trans_date
+                            """),
+                            {"user_id": service.user_id, "fund_code": plan.fund_code, "trans_date": today}
+                        )
+                        
+                        exists = result.scalar()
+                        print(f"[DEBUG] 交易记录已存在: {exists > 0}")
+                        
+                        if exists == 0:
+                            print(f"[DEBUG] 插入交易记录: {plan.fund_code}, 金额: {plan.amount}")
+                            session.execute(
+                                text("""
+                                    INSERT INTO transactions (
+                                        user_id, fund_code, fund_name, transaction_date, 
+                                        nav_date, transaction_type, target_amount, note
+                                    ) VALUES (
+                                        :user_id, :fund_code, :fund_name, :trans_date,
+                                        :nav_date, :trans_type, :target_amount, :note
+                                    )
+                                """),
+                                {
+                                    "user_id": service.user_id,
+                                    "fund_code": plan.fund_code,
+                                    "fund_name": plan.fund_name,
+                                    "trans_date": today,
+                                    "nav_date": confirm_date,
+                                    "trans_type": "买入",
+                                    "target_amount": plan.amount,
+                                    "note": f"[待确认] {plan.plan_name}"
+                                }
+                            )
+                            transactions_created += 1
+                            print(f"[DEBUG] 成功创建交易记录")
         
-        for plan in enabled_plans:
-            print(f"[DEBUG] 处理计划: {plan.plan_name}")
-            
-            # Check if plan should execute today based on frequency
-            start_date = datetime.strptime(plan.start_date, '%Y-%m-%d')
-            end_date = datetime.strptime(plan.end_date, '%Y-%m-%d')
-            
-            if not (start_date <= today_dt <= end_date):
-                print(f"[DEBUG] 跳过: 不在日期范围内")
-                continue
-            
-            should_execute = False
-            if plan.frequency == 'daily':
-                should_execute = True
-            elif plan.frequency == 'weekly':
-                should_execute = (today_dt.weekday() == start_date.weekday())
-            elif plan.frequency == 'monthly':
-                should_execute = (today_dt.day == start_date.day)
-            
-            print(f"[DEBUG] 是否应执行: {should_execute}")
-            
-            if should_execute:
-                # Calculate T+1 confirm date (next weekday)
-                confirm_dt = today_dt + timedelta(days=1)
-                while confirm_dt.weekday() >= 5:
-                    confirm_dt += timedelta(days=1)
-                confirm_date = confirm_dt.strftime('%Y-%m-%d')
-                
-                # Check if transaction already exists
-                cur.execute("""
-                    SELECT COUNT(*) FROM transactions
-                    WHERE user_id = ? AND fund_code = ? AND transaction_date = ?
-                """, (service.user_id, plan.fund_code, today))
-                
-                exists = cur.fetchone()[0]
-                print(f"[DEBUG] 交易记录已存在: {exists > 0}")
-                
-                if exists == 0:
-                    print(f"[DEBUG] 插入交易记录: {plan.fund_code}, 金额: {plan.amount}")
-                    cur.execute("""
-                        INSERT INTO transactions (
-                            user_id, fund_code, fund_name, transaction_date, 
-                            nav_date, transaction_type, target_amount, note
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        service.user_id,
-                        plan.fund_code,
-                        plan.fund_name,
-                        today,
-                        confirm_date,
-                        '买入',
-                        plan.amount,
-                        f"[待确认] {plan.plan_name}"
-                    ))
-                    transactions_created += 1
-                    print(f"[DEBUG] 成功创建交易记录")
-        
-        conn.commit()
         print(f"[DEBUG] 提交事务,共创建 {transactions_created} 条记录")
-        conn.close()
         
         return {
             "message": f"成功创建 {transactions_created} 条定投交易记录",
