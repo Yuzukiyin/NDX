@@ -62,7 +62,8 @@ class FundService:
     ) -> List[Transaction]:
         base_query = """
             SELECT transaction_id, fund_code, fund_name, transaction_date::text, nav_date::text,
-                   transaction_type, target_amount::float, shares::float, unit_nav::float, amount::float, note, created_at::text
+                   transaction_type, target_amount::float, shares::float, unit_nav::float, amount::float, note, 
+                   to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
             FROM transactions
             WHERE user_id = :user_id
         """

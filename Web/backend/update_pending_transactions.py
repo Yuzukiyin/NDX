@@ -103,7 +103,7 @@ class PendingTransactionUpdater:
                 row[0]
                 for row in conn.execute(
                     text(
-                        """SELECT DISTINCT nav_date FROM transactions
+                        """SELECT DISTINCT nav_date::text FROM transactions
                              WHERE user_id = :user_id AND shares IS NULL
                              ORDER BY nav_date"""
                     ),

@@ -3,9 +3,8 @@ __pycache__
 venv
 
 # Database files
-fund.db
-ndx_users.db
-*.db
+
+
 
 # CSV data files
 transactions.csv
