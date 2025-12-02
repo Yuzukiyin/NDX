@@ -24,9 +24,9 @@ class FundService:
         result = await self.db.execute(
             text(
                 """
-                SELECT fund_code, fund_name, total_shares, total_cost, average_buy_nav,
-                       current_nav, current_value, profit, profit_rate,
-                       first_buy_date, last_transaction_date, last_nav_date, daily_growth_rate
+                SELECT fund_code, fund_name, total_shares::float, total_cost::float, average_buy_nav::float,
+                       current_nav::float, current_value::float, profit::float, profit_rate::float,
+                       first_buy_date, last_transaction_date, last_nav_date, daily_growth_rate::float
                 FROM fund_realtime_overview
                 WHERE user_id = :user_id
                 ORDER BY fund_code
@@ -41,9 +41,9 @@ class FundService:
         result = await self.db.execute(
             text(
                 """
-                SELECT fund_code, fund_name, total_shares, total_cost, average_buy_nav,
-                       current_nav, current_value, profit, profit_rate,
-                       first_buy_date, last_transaction_date, last_nav_date, daily_growth_rate
+                SELECT fund_code, fund_name, total_shares::float, total_cost::float, average_buy_nav::float,
+                       current_nav::float, current_value::float, profit::float, profit_rate::float,
+                       first_buy_date, last_transaction_date, last_nav_date, daily_growth_rate::float
                 FROM fund_realtime_overview
                 WHERE user_id = :user_id AND fund_code = :fund_code
                 LIMIT 1
@@ -62,7 +62,7 @@ class FundService:
     ) -> List[Transaction]:
         base_query = """
             SELECT transaction_id, fund_code, fund_name, transaction_date, nav_date,
-                   transaction_type, target_amount, shares, unit_nav, amount, note, created_at
+                   transaction_type, target_amount::float, shares::float, unit_nav::float, amount::float, note, created_at
             FROM transactions
             WHERE user_id = :user_id
         """
@@ -108,7 +108,7 @@ class FundService:
     async def get_profit_summary(self) -> Optional[ProfitSummary]:
         result = await self.db.execute(
             text(
-                "SELECT total_funds, total_shares, total_cost, total_value, total_profit, total_return_rate "
+                "SELECT total_funds, total_shares::float, total_cost::float, total_value::float, total_profit::float, total_return_rate::float "
                 "FROM profit_summary WHERE user_id = :user_id"
             ),
             {"user_id": self.user_id},
