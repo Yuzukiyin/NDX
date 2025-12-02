@@ -44,6 +44,20 @@ class Settings(BaseSettings):
         elif url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
+
+    @property
+    def database_url_sync(self) -> str:
+        """Return sync driver URL for background scripts"""
+        url = self.DATABASE_URL
+        if url.startswith("sqlite+aiosqlite:///"):
+            return url.replace("sqlite+aiosqlite:///", "sqlite:///", 1)
+        if url.startswith("sqlite:///"):
+            return url
+        if url.startswith("postgresql+asyncpg://"):
+            return url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+        if url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return url
     
     # CORS
     CORS_ORIGINS: list = [

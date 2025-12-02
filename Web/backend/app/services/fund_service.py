@@ -1,209 +1,175 @@
-"""Fund data service - interfaces with original NDX fund database"""
-import sqlite3
+"""Fund data service backed by SQLAlchemy/AsyncSession"""
+from typing import List, Optional
+import asyncio
 import sys
 from pathlib import Path
-from typing import List, Optional, Dict
-from datetime import datetime
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..models.schemas import FundOverview, Transaction, NavHistory, ProfitSummary
 from ..config import settings
 
-# Add parent directory to path to import original modules
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 
 class FundService:
-    """Service for accessing fund data"""
-    
-    def __init__(self, user_id: int):
-        """Initialize with user-specific context.
-        Now all fund data is stored in the unified ndx_users.db.
-        """
+    """提供基金及交易相关的数据服务"""
+
+    def __init__(self, user_id: int, db: AsyncSession):
         self.user_id = user_id
-        # Parse sqlite path from DATABASE_URL (sqlite+aiosqlite:///./ndx_users.db)
-        db_url = settings.database_url_async
-        if db_url.startswith("sqlite+aiosqlite:///"):
-            self.db_path = db_url.replace("sqlite+aiosqlite:///", "")
-        elif db_url.startswith("sqlite:///"):
-            self.db_path = db_url.replace("sqlite:///", "")
-        else:
-            # Fallback to default relative file
-            self.db_path = "./ndx_users.db"
-    
-    def get_connection(self) -> sqlite3.Connection:
-        """Get database connection"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
-    
-    def get_fund_overview(self) -> List[FundOverview]:
-        """Get all funds overview"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            "SELECT * FROM fund_realtime_overview WHERE user_id = ? ORDER BY fund_code",
-            (self.user_id,)
+        self.db: AsyncSession = db
+
+    async def get_fund_overview(self) -> List[FundOverview]:
+        result = await self.db.execute(
+            text(
+                """
+                SELECT fund_code, fund_name, total_shares, total_cost, average_buy_nav,
+                       current_nav, current_value, profit, profit_rate,
+                       first_buy_date, last_transaction_date, last_nav_date, daily_growth_rate
+                FROM fund_realtime_overview
+                WHERE user_id = :user_id
+                ORDER BY fund_code
+                """
+            ),
+            {"user_id": self.user_id},
         )
-        rows = cursor.fetchall()
-        conn.close()
-        
+        rows = result.mappings().all()
         return [FundOverview(**dict(row)) for row in rows]
-    
-    def get_fund_detail(self, fund_code: str) -> Optional[FundOverview]:
-        """Get specific fund detail"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            "SELECT * FROM fund_realtime_overview WHERE user_id = ? AND fund_code = ?",
-            (self.user_id, fund_code)
+
+    async def get_fund_detail(self, fund_code: str) -> Optional[FundOverview]:
+        result = await self.db.execute(
+            text(
+                """
+                SELECT fund_code, fund_name, total_shares, total_cost, average_buy_nav,
+                       current_nav, current_value, profit, profit_rate,
+                       first_buy_date, last_transaction_date, last_nav_date, daily_growth_rate
+                FROM fund_realtime_overview
+                WHERE user_id = :user_id AND fund_code = :fund_code
+                LIMIT 1
+                """
+            ),
+            {"user_id": self.user_id, "fund_code": fund_code},
         )
-        row = cursor.fetchone()
-        conn.close()
-        
+        row = result.mappings().first()
         return FundOverview(**dict(row)) if row else None
-    
-    def get_transactions(
+
+    async def get_transactions(
         self,
         fund_code: Optional[str] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[Transaction]:
-        """Get transaction records"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
+        base_query = """
+            SELECT transaction_id, fund_code, fund_name, transaction_date, nav_date,
+                   transaction_type, target_amount, shares, unit_nav, amount, note, created_at
+            FROM transactions
+            WHERE user_id = :user_id
+        """
+
+        params = {"user_id": self.user_id, "limit": limit, "offset": offset}
         if fund_code:
-            cursor.execute(
-                """SELECT * FROM transactions 
-                WHERE user_id = ? AND fund_code = ? 
-                ORDER BY transaction_date DESC, transaction_id DESC 
-                LIMIT ? OFFSET ?""",
-                (self.user_id, fund_code, limit, offset)
-            )
-        else:
-            cursor.execute(
-                """SELECT * FROM transactions 
-                WHERE user_id = ?
-                ORDER BY transaction_date DESC, transaction_id DESC 
-                LIMIT ? OFFSET ?""",
-                (self.user_id, limit, offset)
-            )
-        
-        rows = cursor.fetchall()
-        conn.close()
-        
+            base_query += " AND fund_code = :fund_code"
+            params["fund_code"] = fund_code
+
+        base_query += " ORDER BY transaction_date DESC, transaction_id DESC LIMIT :limit OFFSET :offset"
+
+        result = await self.db.execute(text(base_query), params)
+        rows = result.mappings().all()
         return [Transaction(**dict(row)) for row in rows]
-    
-    def get_nav_history(
+
+    async def get_nav_history(
         self,
         fund_code: str,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
     ) -> List[NavHistory]:
-        """Get historical NAV data (shared globally across all users)"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        query = "SELECT price_date, unit_nav, cumulative_nav, daily_growth_rate FROM fund_nav_history WHERE fund_code = ?"
-        params = [fund_code]
-        
+        query = """
+            SELECT price_date, unit_nav, cumulative_nav, daily_growth_rate
+            FROM fund_nav_history
+            WHERE fund_code = :fund_code
+        """
+        params = {"fund_code": fund_code}
+
         if start_date:
-            query += " AND price_date >= ?"
-            params.append(start_date)
-        
+            query += " AND price_date >= :start_date"
+            params["start_date"] = start_date
+
         if end_date:
-            query += " AND price_date <= ?"
-            params.append(end_date)
-        
+            query += " AND price_date <= :end_date"
+            params["end_date"] = end_date
+
         query += " ORDER BY price_date ASC"
-        
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        conn.close()
-        
+
+        result = await self.db.execute(text(query), params)
+        rows = result.mappings().all()
         return [NavHistory(**dict(row)) for row in rows]
-    
-    def get_profit_summary(self) -> Optional[ProfitSummary]:
-        """Get overall profit summary"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM profit_summary WHERE user_id = ?", (self.user_id,))
-        row = cursor.fetchone()
-        conn.close()
-        
+
+    async def get_profit_summary(self) -> Optional[ProfitSummary]:
+        result = await self.db.execute(
+            text(
+                "SELECT total_funds, total_shares, total_cost, total_value, total_profit, total_return_rate "
+                "FROM profit_summary WHERE user_id = :user_id"
+            ),
+            {"user_id": self.user_id},
+        )
+        row = result.mappings().first()
         return ProfitSummary(**dict(row)) if row else None
-    
-    def initialize_user_database(self):
-        """Ensure fund tables exist in unified database"""
-        schema_file = Path(__file__).parent.parent / 'db' / 'fund_multitenant.sql'
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fund_overview'")
-        if cursor.fetchone() is None and schema_file.exists():
-            conn.executescript(schema_file.read_text(encoding='utf-8'))
-        conn.close()
-    
-    def fetch_history_nav(self, fund_codes: Optional[List[str]] = None):
-        """Fetch historical NAV data"""
+
+    async def initialize_user_database(self):
+        """PostgreSQL 由 init_db 自动创建结构，此处保留占位"""
+        return {"message": "PostgreSQL schema is managed automatically"}
+
+    async def fetch_history_nav(self, fund_codes: Optional[List[str]] = None):
         try:
-            # 导入时添加路径
             import sys
             backend_dir = Path(__file__).parent.parent.parent
             if str(backend_dir) not in sys.path:
                 sys.path.insert(0, str(backend_dir))
-            
+
             from fetch_history_nav import HistoryNavFetcher
-            
-            # 使用settings中的配置文件路径
+
             config_path = settings.auto_invest_config_resolved
-            
             fetcher = HistoryNavFetcher(
                 config_path=config_path,
-                db_path=self.db_path
+                db_url=settings.database_url_sync,
+                data_source='fundSpider',
             )
-            
-            # 调用正确的方法
-            fetcher.import_enabled_plans()
+
+            # 运行阻塞任务到线程池，避免阻塞事件循环
+            return await asyncio.to_thread(fetcher.import_enabled_plans)
         except ImportError as e:
             raise Exception(f"无法导入历史净值模块: {e}")
         except Exception as e:
             raise Exception(f"抓取历史净值失败: {e}")
-    
-    def import_transactions_from_csv(self, csv_path: str):
-        """Import transactions from CSV"""
-        from import_transactions import TransactionImporter
-        
-        importer = TransactionImporter(db_path=self.db_path)
-        importer.import_from_csv(csv_path)
-    
-    def update_pending_transactions(self):
-        """Update pending transactions"""
+
+    async def update_pending_transactions(self, use_target_amount: bool = True, auto_remove_non_trading: bool = True):
         try:
-            # 导入时添加路径
             import sys
             backend_dir = Path(__file__).parent.parent.parent
             if str(backend_dir) not in sys.path:
                 sys.path.insert(0, str(backend_dir))
-            
+
             from update_pending_transactions import PendingTransactionUpdater
-            
-            # 使用settings中的配置文件路径
+
             config_path = settings.auto_invest_config_resolved
-            
             updater = PendingTransactionUpdater(
-                db_path=self.db_path,
+                db_path=settings.FUND_DB_PATH,
                 config_file=config_path,
-                user_id=self.user_id
+                user_id=self.user_id,
+                db_url=settings.database_url_sync,
             )
-            updater.process_pending_records()
+            return await asyncio.to_thread(
+                updater.process_pending_records,
+                use_target_amount,
+                auto_remove_non_trading,
+            )
         except ImportError as e:
             raise Exception(f"无法导入待确认交易更新模块: {e}")
         except Exception as e:
             raise Exception(f"更新待确认交易失败: {e}")
-    
-    def add_transaction(
+
+    async def add_transaction(
         self,
         fund_code: str,
         fund_name: str,
@@ -214,53 +180,68 @@ class FundService:
         unit_nav: Optional[float] = None,
         note: str = '',
         nav_date: Optional[str] = None,
-        target_amount: Optional[float] = None
+        target_amount: Optional[float] = None,
     ):
-        """Add a new transaction"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        # Calculate amount if shares and unit_nav provided
-        if shares and unit_nav:
+        if shares and unit_nav and amount is None:
             amount = round(shares * unit_nav, 2)
-        
-        cursor.execute("""
-            INSERT INTO transactions (
-                user_id, fund_code, fund_name, transaction_date, nav_date,
-                transaction_type, target_amount, shares, unit_nav, amount, note
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            self.user_id, fund_code, fund_name, transaction_date, nav_date,
-            transaction_type, target_amount, shares, unit_nav, amount, note
-        ))
-        
-        conn.commit()
-        conn.close()
-    
-    def add_nav_history_batch(self, nav_records: List[dict]):
-        """Batch add NAV history records (shared globally)"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
+
+        await self.db.execute(
+            text(
+                """
+                INSERT INTO transactions (
+                    user_id, fund_code, fund_name, transaction_date, nav_date,
+                    transaction_type, target_amount, shares, unit_nav, amount, note
+                ) VALUES (
+                    :user_id, :fund_code, :fund_name, :transaction_date, :nav_date,
+                    :transaction_type, :target_amount, :shares, :unit_nav, :amount, :note
+                )
+                """
+            ),
+            {
+                "user_id": self.user_id,
+                "fund_code": fund_code,
+                "fund_name": fund_name,
+                "transaction_date": transaction_date,
+                "nav_date": nav_date,
+                "transaction_type": transaction_type,
+                "target_amount": target_amount,
+                "shares": shares,
+                "unit_nav": unit_nav,
+                "amount": amount,
+                "note": note,
+            },
+        )
+        await self.db.commit()
+
+    async def add_nav_history_batch(self, nav_records: List[dict]):
+        if not nav_records:
+            return
+
+        sql = text(
+            """
+            INSERT INTO fund_nav_history (
+                fund_code, fund_name, price_date, unit_nav, cumulative_nav, daily_growth_rate, data_source
+            ) VALUES (
+                :fund_code, :fund_name, :price_date, :unit_nav, :cumulative_nav, :daily_growth_rate, :data_source
+            )
+            ON CONFLICT (fund_code, price_date, data_source) DO UPDATE SET
+                unit_nav = EXCLUDED.unit_nav,
+                cumulative_nav = EXCLUDED.cumulative_nav,
+                daily_growth_rate = EXCLUDED.daily_growth_rate,
+                fetched_at = CURRENT_TIMESTAMP
+            """
+        )
+
         for record in nav_records:
-            # Check if record already exists
-            cursor.execute("""
-                SELECT 1 FROM fund_nav_history 
-                WHERE fund_code = ? AND price_date = ?
-            """, (record['fund_code'], record['price_date']))
-            
-            if not cursor.fetchone():
-                cursor.execute("""
-                    INSERT INTO fund_nav_history (
-                        fund_code, fund_name, price_date, unit_nav, fetched_at
-                    ) VALUES (?, ?, ?, ?, ?)
-                """, (
-                    record['fund_code'],
-                    record.get('fund_name', ''),
-                    record['price_date'],
-                    record['unit_nav'],
-                    record.get('fetched_at', datetime.now().isoformat())
-                ))
-        
-        conn.commit()
-        conn.close()
+            payload = {
+                "fund_code": record["fund_code"],
+                "fund_name": record.get("fund_name", ""),
+                "price_date": record["price_date"],
+                "unit_nav": record["unit_nav"],
+                "cumulative_nav": record.get("cumulative_nav"),
+                "daily_growth_rate": record.get("daily_growth_rate"),
+                "data_source": record.get("data_source", "fundSpider"),
+            }
+            await self.db.execute(sql, payload)
+
+        await self.db.commit()

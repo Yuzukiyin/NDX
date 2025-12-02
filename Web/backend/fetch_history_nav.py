@@ -5,17 +5,28 @@
 import sys
 import os
 import json
-import sqlite3
 from datetime import datetime, timedelta
+from sqlalchemy import create_engine, text
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'fundSpider'))
 from fundSpider.fund_info import FuncInfo
 
 class HistoryNavFetcher:
-    def __init__(self, config_path='auto_invest_setting.json', db_path='fund.db', data_source='fundSpider'):
+    def __init__(self, config_path='auto_invest_setting.json', db_path='fund.db', data_source='fundSpider', db_url: str | None = None):
         '''设置默认输出目录和配置文件路径'''
         self.config_path = config_path
-        self.db_path = db_path
         self.data_source = data_source
+        self.db_url = self._resolve_db_url(db_url or db_path)
+        self.engine = create_engine(self.db_url, future=True)
+
+    def _resolve_db_url(self, raw: str) -> str:
+        if not raw:
+            return 'sqlite:///fund.db'
+        if '://' in raw:
+            return raw
+        abs_path = raw
+        if not os.path.isabs(abs_path):
+            abs_path = os.path.join(os.getcwd(), raw)
+        return f"sqlite:///{abs_path}"
 
     def load_enabled_plans(self):
         """读取启用定投计划并返回列表字典
@@ -111,15 +122,16 @@ class HistoryNavFetcher:
         Returns:
             bool: True=已存在, False=不存在
         """
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT COUNT(*) FROM fund_nav_history
-            WHERE fund_code = ? AND price_date = ? AND data_source = ?
-        """, (fund_code, price_date, self.data_source))
-        count = cur.fetchone()[0]
-        conn.close()
-        return count > 0
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    """SELECT 1 FROM fund_nav_history
+                        WHERE fund_code = :fund_code AND price_date = :price_date AND data_source = :source
+                        LIMIT 1"""
+                ),
+                {"fund_code": fund_code, "price_date": price_date, "source": self.data_source},
+            )
+            return result.first() is not None
 
     def get_latest_nav_date(self, fund_code):
         """获取指定基金在当前 data_source 下已存在的最新净值日期
@@ -129,15 +141,14 @@ class HistoryNavFetcher:
         Returns:
             str | None: 最新 price_date (YYYY-MM-DD) 如果不存在返回 None
         """
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT MAX(price_date) FROM fund_nav_history
-            WHERE fund_code = ? AND data_source = ?
-        """, (fund_code, self.data_source))
-        row = cur.fetchone()
-        conn.close()
-        latest = row[0] if row and row[0] else None
+        with self.engine.connect() as conn:
+            latest = conn.execute(
+                text(
+                    """SELECT MAX(price_date) FROM fund_nav_history
+                        WHERE fund_code = :fund_code AND data_source = :source"""
+                ),
+                {"fund_code": fund_code, "source": self.data_source},
+            ).scalar()
         return latest
 
     def save_nav_history(self, df, fund_code, fund_name):
@@ -192,37 +203,36 @@ class HistoryNavFetcher:
             print(f"{fund_code} 没有可写入的有效净值行（全部已存在或无效）")
             return 0
         
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS fund_nav_history (
-            nav_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fund_code TEXT NOT NULL,
-            fund_name TEXT NOT NULL,
-            price_date TEXT NOT NULL,
-            unit_nav REAL NOT NULL,
-            cumulative_nav REAL,
-            daily_growth_rate REAL,
-            data_source TEXT DEFAULT 'fundSpider',
-            fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(fund_code, price_date, data_source)
-        );
-        """)
-        sql = """
-        INSERT INTO fund_nav_history (
-            fund_code,fund_name,price_date,unit_nav,cumulative_nav,daily_growth_rate,
-            data_source
-        ) VALUES (?,?,?,?,?,?,?)
-        ON CONFLICT(fund_code, price_date, data_source) DO UPDATE SET
-            unit_nav=excluded.unit_nav,
-            cumulative_nav=excluded.cumulative_nav,
-            daily_growth_rate=excluded.daily_growth_rate,
-            fetched_at=CURRENT_TIMESTAMP;
-        """
-        cur.executemany(sql, records)
-        conn.commit()
-        affected = cur.rowcount
-        conn.close()
+        sql = text(
+            """
+            INSERT INTO fund_nav_history (
+                fund_code, fund_name, price_date, unit_nav, cumulative_nav, daily_growth_rate, data_source
+            ) VALUES (
+                :fund_code, :fund_name, :price_date, :unit_nav, :cumulative_nav, :daily_growth_rate, :data_source
+            )
+            ON CONFLICT (fund_code, price_date, data_source) DO UPDATE SET
+                unit_nav = EXCLUDED.unit_nav,
+                cumulative_nav = EXCLUDED.cumulative_nav,
+                daily_growth_rate = EXCLUDED.daily_growth_rate,
+                fetched_at = CURRENT_TIMESTAMP
+            """
+        )
+        payloads = [
+            {
+                'fund_code': rec[0],
+                'fund_name': rec[1],
+                'price_date': rec[2],
+                'unit_nav': rec[3],
+                'cumulative_nav': rec[4],
+                'daily_growth_rate': rec[5],
+                'data_source': rec[6],
+            }
+            for rec in records
+        ]
+
+        with self.engine.begin() as conn:
+            result = conn.execute(sql, payloads)
+            affected = result.rowcount or 0
         
         total_processed = len(records) + skipped_count
         print(f"写入 fund_nav_history 完成: {fund_code} 新增 {len(records)} 行，跳过 {skipped_count} 行，共处理 {total_processed} 行")
@@ -243,7 +253,7 @@ class HistoryNavFetcher:
                 return []
             end_used_global = end_date_override or datetime.now().strftime('%Y-%m-%d')
             details = []
-            print(f"\n将导入 {len(plans)} 个启用计划到数据库: {self.db_path}")
+            print(f"\n将导入 {len(plans)} 个启用计划到数据库: {self.db_url}")
             for plan in plans:
                 fund_code = plan['fund_code']
                 fund_name = plan['fund_name']

@@ -1,17 +1,17 @@
-"""Database connection and session management"""
+"""数据库连接与会话管理"""
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from ..config import settings
 from pathlib import Path
 
-# Create async engine
+# 创建异步引擎
 engine = create_async_engine(
     settings.database_url_async,
     echo=settings.DEBUG,
     future=True
 )
 
-# Create session factory
+# 创建会话工厂
 async_session_factory = async_sessionmaker(
     engine,
     class_=AsyncSession,
@@ -22,7 +22,7 @@ Base = declarative_base()
 
 
 async def get_db():
-    """Dependency to get database session"""
+    """获取数据库会话的依赖"""
     async with async_session_factory() as session:
         try:
             yield session
@@ -31,27 +31,29 @@ async def get_db():
 
 
 async def init_db():
-    """Initialize database tables"""
+    """初始化数据库表"""
     from ..models.user import Base
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Fund tables initialization - only for SQLite
-        # PostgreSQL will skip this since SQL file contains SQLite-specific syntax
+        # 基金相关表初始化（支持 SQLite / PostgreSQL）
         try:
             db_url = settings.database_url_async.lower()
+            schema_dir = Path(__file__).parent.parent / 'db'
             if 'sqlite' in db_url:
-                # Only initialize fund tables for SQLite
                 res = await conn.exec_driver_sql(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name='fund_overview'"
                 )
                 if res.fetchone() is None:
-                    schema_path = Path(__file__).parent.parent / 'db' / 'fund_multitenant.sql'
+                    schema_path = schema_dir / 'fund_multitenant.sql'
                     sql = schema_path.read_text(encoding='utf-8')
                     await conn.exec_driver_sql(sql)
                     print("✅ Fund schema initialized (SQLite)")
+            elif 'postgresql' in db_url:
+                schema_path = schema_dir / 'fund_multitenant_postgres.sql'
+                sql = schema_path.read_text(encoding='utf-8')
+                await conn.exec_driver_sql(sql)
+                print("✅ Fund schema initialized (PostgreSQL)")
             else:
-                # PostgreSQL: skip fund table initialization for now
-                # TODO: Create PostgreSQL-compatible fund schema
-                print("⚠️ Fund schema skipped for PostgreSQL (not implemented yet)")
+                print("⚠️ Unsupported database for fund schema initialization")
         except Exception as e:
             print(f"⚠️ Fund schema init error: {e}")

@@ -6,19 +6,29 @@
 #fund.db
 #auto_invest_setting.json
 
-import sqlite3
+import os
 from datetime import datetime, timedelta
-from import_transactions import TransactionImporter
+from sqlalchemy import create_engine, text
 from tradeDate import TradeDateChecker
 
+
 class PendingTransactionUpdater:
-    def __init__(self, db_path='fund.db', config_file='auto_invest_setting.json', user_id=1):
+    def __init__(self, db_path='fund.db', config_file='auto_invest_setting.json', user_id=1, db_url: str | None = None):
         self.db_path = db_path
         self.config_file = config_file
         self.user_id = user_id
         self.checker = TradeDateChecker(config_file=config_file, db_path=db_path)
         self.plans = self._build_plan_map()
-        self.importer = TransactionImporter(db_path=db_path, user_id=user_id)
+        self.db_url = self._resolve_db_url(db_url or db_path)
+        self.engine = create_engine(self.db_url, future=True)
+
+    def _resolve_db_url(self, raw: str) -> str:
+        if not raw:
+            return 'sqlite:///fund.db'
+        if '://' in raw:
+            return raw
+        abs_path = raw if os.path.isabs(raw) else os.path.join(os.getcwd(), raw)
+        return f"sqlite:///{abs_path}"
     
     def _build_plan_map(self):
         """从 TradeDateChecker 加载的计划构建 fund_code -> amount 映射"""
@@ -32,17 +42,17 @@ class PendingTransactionUpdater:
     
     def get_pending_transactions(self):
         """查询当前用户所有待确认的交易记录（shares IS NULL）"""
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT transaction_id, fund_code, fund_name, transaction_date, nav_date, note
-            FROM transactions
-            WHERE user_id = ? AND shares IS NULL
-            ORDER BY transaction_date, transaction_id
-        """, (self.user_id,))
-        rows = cur.fetchall()
-        conn.close()
-        return rows
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    """SELECT transaction_id, fund_code, fund_name, transaction_date, nav_date, note
+                         FROM transactions
+                         WHERE user_id = :user_id AND shares IS NULL
+                         ORDER BY transaction_date, transaction_id"""
+                ),
+                {"user_id": self.user_id},
+            )
+            return [tuple(row) for row in result.fetchall()]
     
     def update_transaction(self, transaction_id, fund_name, unit_nav, shares, amount, note_original):
         """
@@ -59,23 +69,28 @@ class PendingTransactionUpdater:
         Returns:
             bool: 更新成功返回True
         """
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
-        # 移除备注中的 [待确认] 标记
         note_updated = note_original.replace('[待确认]', '').strip()
-        cur.execute("""
-            UPDATE transactions
-            SET fund_name = ?,
-                shares = ?,
-                unit_nav = ?,
-                amount = ?,
-                note = ?
-            WHERE transaction_id = ?
-        """, (fund_name, shares, unit_nav, amount, note_updated, transaction_id))
-        conn.commit()
-        affected = cur.rowcount
-        conn.close()
-        return affected > 0
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """UPDATE transactions
+                         SET fund_name = :fund_name,
+                             shares = :shares,
+                             unit_nav = :unit_nav,
+                             amount = :amount,
+                             note = :note
+                         WHERE transaction_id = :transaction_id"""
+                ),
+                {
+                    "fund_name": fund_name,
+                    "shares": shares,
+                    "unit_nav": unit_nav,
+                    "amount": amount,
+                    "note": note_updated,
+                    "transaction_id": transaction_id,
+                },
+            )
+            return bool(result.rowcount)
 
     def _auto_clean_non_trading_days(self):
         """
@@ -83,18 +98,18 @@ class PendingTransactionUpdater:
         
         检查逻辑：遍历所有待确认记录的nav_date，如果该日期无净值但次日有净值，判定为非交易日并删除
         """
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
-        
-        # 获取当前用户所有待确认记录的不同nav_date
-        cur.execute("""
-            SELECT DISTINCT nav_date
-            FROM transactions
-            WHERE user_id = ? AND shares IS NULL
-            ORDER BY nav_date
-        """, (self.user_id,))
-        
-        pending_dates = [row[0] for row in cur.fetchall()]
+        with self.engine.begin() as conn:
+            pending_dates = [
+                row[0]
+                for row in conn.execute(
+                    text(
+                        """SELECT DISTINCT nav_date FROM transactions
+                             WHERE user_id = :user_id AND shares IS NULL
+                             ORDER BY nav_date"""
+                    ),
+                    {"user_id": self.user_id},
+                ).fetchall()
+            ]
         
         if not pending_dates:
             print("没有待确认记录需要检查")
@@ -110,31 +125,38 @@ class PendingTransactionUpdater:
             next_day = (check_dt + timedelta(days=1)).strftime('%Y-%m-%d')
             
             # 获取该日期的待确认基金代码
-            cur.execute("""
-                SELECT DISTINCT fund_code
-                FROM transactions
-                WHERE user_id = ? AND nav_date = ? AND shares IS NULL
-            """, (self.user_id, check_date))
-            
-            affected_funds = [row[0] for row in cur.fetchall()]
+            affected_funds = [
+                row[0]
+                for row in conn.execute(
+                    text(
+                        """SELECT DISTINCT fund_code FROM transactions
+                             WHERE user_id = :user_id AND nav_date = :nav_date AND shares IS NULL"""
+                    ),
+                    {"user_id": self.user_id, "nav_date": check_date},
+                ).fetchall()
+            ]
             
             # 检查每个基金是否符合非交易日条件
             non_trading_funds = []
             
             for fund_code in affected_funds:
                 # 检查check_date是否有净值
-                cur.execute("""
-                    SELECT COUNT(*) FROM fund_nav_history
-                    WHERE fund_code = ? AND price_date = ?
-                """, (fund_code, check_date))
-                count_check = cur.fetchone()[0]
+                count_check = conn.execute(
+                    text(
+                        """SELECT COUNT(*) FROM fund_nav_history
+                             WHERE fund_code = :fund_code AND price_date = :price_date"""
+                    ),
+                    {"fund_code": fund_code, "price_date": check_date},
+                ).scalar() or 0
                 
                 # 检查next_day是否有净值
-                cur.execute("""
-                    SELECT COUNT(*) FROM fund_nav_history
-                    WHERE fund_code = ? AND price_date = ?
-                """, (fund_code, next_day))
-                count_next = cur.fetchone()[0]
+                count_next = conn.execute(
+                    text(
+                        """SELECT COUNT(*) FROM fund_nav_history
+                             WHERE fund_code = :fund_code AND price_date = :price_date"""
+                    ),
+                    {"fund_code": fund_code, "price_date": next_day},
+                ).scalar() or 0
                 
                 if count_check == 0 and count_next > 0:
                     non_trading_funds.append(fund_code)
@@ -144,21 +166,21 @@ class PendingTransactionUpdater:
                 print(f"  {check_date}: 检测到非交易日 (基金: {', '.join(non_trading_funds)})")
                 
                 for fund_code in non_trading_funds:
-                    cur.execute("""
-                        SELECT transaction_id, transaction_date, note
-                        FROM transactions
-                        WHERE user_id = ? AND fund_code = ? AND nav_date = ? AND shares IS NULL
-                    """, (self.user_id, fund_code, check_date))
-                    
-                    to_delete = cur.fetchall()
-                    
+                    to_delete = conn.execute(
+                        text(
+                            """SELECT transaction_id, transaction_date, note FROM transactions
+                                 WHERE user_id = :user_id AND fund_code = :fund_code AND nav_date = :nav_date AND shares IS NULL"""
+                        ),
+                        {"user_id": self.user_id, "fund_code": fund_code, "nav_date": check_date},
+                    ).fetchall()
+
                     for tx_id, trans_date, note in to_delete:
                         print(f"    删除: ID={tx_id} {fund_code} 交易日={trans_date}")
-                        cur.execute("DELETE FROM transactions WHERE transaction_id = ?", (tx_id,))
+                        conn.execute(
+                            text("DELETE FROM transactions WHERE transaction_id = :transaction_id"),
+                            {"transaction_id": tx_id},
+                        )
                         total_deleted += 1
-        
-        conn.commit()
-        conn.close()
         
         if total_deleted > 0:
             print(f"\n共删除 {total_deleted} 条非交易日待确认记录")
@@ -202,11 +224,11 @@ class PendingTransactionUpdater:
             # 获取金额
             if use_target_amount:
                 # 从数据库读取target_amount
-                conn = sqlite3.connect(self.db_path)
-                cur = conn.cursor()
-                cur.execute("SELECT target_amount FROM transactions WHERE user_id = ? AND transaction_id = ?", (self.user_id, tx_id))
-                result = cur.fetchone()
-                conn.close()
+                with self.engine.connect() as conn:
+                    result = conn.execute(
+                        text("SELECT target_amount FROM transactions WHERE user_id = :user_id AND transaction_id = :transaction_id"),
+                        {"user_id": self.user_id, "transaction_id": tx_id},
+                    ).first()
                 if not result or result[0] is None:
                     print(f"target_amount为空，跳过\n")
                     skip_count += 1
@@ -221,7 +243,7 @@ class PendingTransactionUpdater:
                 target_amount = self.plans[fund_code]
             
             # 获取净值日净值
-            nav_info = self.importer._get_nav_for_date(fund_code, nav_date)
+            nav_info = self._get_nav_for_date(fund_code, nav_date)
             
             if not nav_info:
                 print(f"净值仍未抓取，跳过\n")
@@ -245,9 +267,23 @@ class PendingTransactionUpdater:
         print(f"更新完成: 成功 {success_count} 条，跳过 {skip_count} 条")
         print("=" * 50)
 
+    def _get_nav_for_date(self, fund_code: str, nav_date: str):
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """SELECT fund_name, unit_nav FROM fund_nav_history
+                         WHERE fund_code = :fund_code AND price_date = :price_date
+                         ORDER BY fetched_at DESC LIMIT 1"""
+                ),
+                {"fund_code": fund_code, "price_date": nav_date},
+            ).first()
+        if not row:
+            return None
+        return row[0], float(row[1])
+
 
 # 向后兼容的函数接口
-def process_pending_records(use_target_amount=True, auto_remove_non_trading=True, db_path='fund.db', config_file='auto_invest_setting.json'):
+def process_pending_records(use_target_amount=True, auto_remove_non_trading=True, db_path='fund.db', config_file='auto_invest_setting.json', db_url: str | None = None):
     """处理所有待确认记录
     
     Args:
@@ -256,6 +292,6 @@ def process_pending_records(use_target_amount=True, auto_remove_non_trading=True
         db_path: 数据库路径
         config_file: 配置文件路径
     """
-    updater = PendingTransactionUpdater(db_path=db_path, config_file=config_file)
+    updater = PendingTransactionUpdater(db_path=db_path, config_file=config_file, db_url=db_url)
     updater.process_pending_records(use_target_amount, auto_remove_non_trading)
     

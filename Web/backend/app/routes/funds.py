@@ -18,7 +18,7 @@ async def get_current_fund_service(
 ) -> FundService:
     """Dependency to get fund service for current user"""
     user = await AuthService.get_current_user(db, credentials.credentials)
-    return FundService(user.id)
+    return FundService(user.id, db)
 
 
 @router.get("/overview", response_model=List[FundOverview])
@@ -27,7 +27,7 @@ async def get_funds_overview(
 ):
     """Get overview of all funds"""
     try:
-        return fund_service.get_fund_overview()
+        return await fund_service.get_fund_overview()
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -42,7 +42,7 @@ async def get_fund_detail(
 ):
     """Get detail of specific fund"""
     try:
-        fund = fund_service.get_fund_detail(fund_code)
+        fund = await fund_service.get_fund_detail(fund_code)
         if not fund:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -67,7 +67,7 @@ async def get_transactions(
 ):
     """Get transaction records"""
     try:
-        return fund_service.get_transactions(fund_code, limit, offset)
+        return await fund_service.get_transactions(fund_code, limit, offset)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -84,7 +84,7 @@ async def get_nav_history(
 ):
     """Get historical NAV data"""
     try:
-        return fund_service.get_nav_history(fund_code, start_date, end_date)
+        return await fund_service.get_nav_history(fund_code, start_date, end_date)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -98,7 +98,7 @@ async def get_profit_summary(
 ):
     """Get overall profit summary"""
     try:
-        summary = fund_service.get_profit_summary()
+        summary = await fund_service.get_profit_summary()
         if not summary:
             # Return empty summary if no data
             return ProfitSummary(
@@ -123,8 +123,8 @@ async def initialize_database(
 ):
     """Initialize user's fund database"""
     try:
-        fund_service.initialize_user_database()
-        return {"message": "数据库初始化成功"}
+        result = await fund_service.initialize_user_database()
+        return result
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -138,8 +138,8 @@ async def fetch_nav(
 ):
     """Fetch historical NAV data for all enabled plans"""
     try:
-        fund_service.fetch_history_nav(fund_codes=None)
-        return {"message": "历史净值抓取完成"}
+        details = await fund_service.fetch_history_nav(fund_codes=None)
+        return {"message": "历史净值抓取完成", "details": details}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -153,7 +153,7 @@ async def update_pending(
 ):
     """Update pending transactions"""
     try:
-        fund_service.update_pending_transactions()
+        await fund_service.update_pending_transactions()
         return {"message": "待确认交易更新完成"}
     except Exception as e:
         raise HTTPException(
@@ -169,7 +169,7 @@ async def create_transaction(
 ):
     """Create a new transaction"""
     try:
-        fund_service.add_transaction(
+        await fund_service.add_transaction(
             fund_code=transaction['fund_code'],
             fund_name=transaction.get('fund_name', ''),
             transaction_date=transaction['transaction_date'],
@@ -198,7 +198,7 @@ async def batch_create_transactions(
     try:
         success_count = 0
         for trans in transactions:
-            fund_service.add_transaction(
+            await fund_service.add_transaction(
                 fund_code=trans['fund_code'],
                 fund_name=trans.get('fund_name', ''),
                 transaction_date=trans['transaction_date'],
@@ -226,7 +226,7 @@ async def batch_create_nav_history(
 ):
     """Batch create NAV history records"""
     try:
-        fund_service.add_nav_history_batch(nav_records)
+        await fund_service.add_nav_history_batch(nav_records)
         return {"message": f"成功导入{len(nav_records)}条净值记录"}
     except Exception as e:
         raise HTTPException(
