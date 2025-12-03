@@ -158,7 +158,7 @@ class HistoryNavFetcher:
         with self.engine.connect() as conn:
             latest = conn.execute(
                 text(
-                    """SELECT MAX(price_date) FROM fund_nav_history
+                    """SELECT MAX(price_date)::text FROM fund_nav_history
                         WHERE fund_code = :fund_code AND data_source = :source"""
                 ),
                 {"fund_code": fund_code, "source": self.data_source},

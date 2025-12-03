@@ -75,11 +75,13 @@ export default function ToolsPage() {
         },
         body: JSON.stringify({})
       })
-      if (response.ok) {
-        setMessage('✅ 历史净值抓取完成!')
+      
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        setMessage(`✅ ${data.message}`)
       } else {
-        const error = await response.json()
-        setMessage(`❌ 抓取失败: ${error.detail}`)
+        setMessage(`❌ 抓取失败: ${data.detail || data.message}`)
       }
     } catch (error: any) {
       setMessage(`❌ 网络错误: ${error.message}`)
@@ -101,11 +103,13 @@ export default function ToolsPage() {
           'Content-Type': 'application/json'
         }
       })
-      if (response.ok) {
-        setMessage('✅ 待确认交易更新完成!')
+      
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        setMessage(`✅ ${data.message}`)
       } else {
-        const error = await response.json()
-        setMessage(`❌ 更新失败: ${error.detail}`)
+        setMessage(`❌ 更新失败: ${data.detail || data.message}`)
       }
     } catch (error: any) {
       setMessage(`❌ 网络错误: ${error.message}`)

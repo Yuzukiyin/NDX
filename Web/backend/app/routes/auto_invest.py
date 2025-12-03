@@ -4,6 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 from pathlib import Path
 from ..models.auto_invest_schemas import AutoInvestPlan, AutoInvestPlanCreate, AutoInvestPlanUpdate
 from ..services.auth_service import AuthService
@@ -128,19 +129,22 @@ async def toggle_plan(
 async def execute_today_plans(
     service: AutoInvestService = Depends(get_auto_invest_service)
 ):
-    """Execute auto-invest plans for today"""
+    """Execute auto-invest plans from start date to today (补齐所有缺失记录)"""
     try:
         from sqlalchemy import create_engine, text
         from sqlalchemy.orm import sessionmaker
+        import sys
+        backend_dir = Path(__file__).parent.parent.parent
+        if str(backend_dir) not in sys.path:
+            sys.path.insert(0, str(backend_dir))
+        from tradeDate import TradeDateChecker
         
         # Get today's date
         today = datetime.now().strftime('%Y-%m-%d')
         today_dt = datetime.now()
         
-        # Simple trading day check (weekdays only)
-        is_weekend = today_dt.weekday() >= 5
-        if is_weekend:
-            return {"message": f"{today} 是周末，非交易日", "transactions_created": 0}
+        # 初始化交易日检查器
+        trade_checker = TradeDateChecker(user_id=service.user_id, db_url=settings.database_url_sync)
         
         print(f"[DEBUG] 用户ID: {service.user_id}")
         
@@ -158,51 +162,65 @@ async def execute_today_plans(
         Session = sessionmaker(bind=engine)
         
         transactions_created = 0
+        skipped_count = 0
         
         with Session() as session:
             with session.begin():
                 for plan in enabled_plans:
-                    print(f"[DEBUG] 处理计划: {plan.plan_name}")
+                    print(f"\n[DEBUG] 处理计划: {plan.plan_name}")
+                    print(f"[DEBUG] 基金: {plan.fund_code}, 频率: {plan.frequency}")
                     
-                    # Check if plan should execute today based on frequency
                     start_date = datetime.strptime(plan.start_date, '%Y-%m-%d')
                     end_date = datetime.strptime(plan.end_date, '%Y-%m-%d')
                     
-                    if not (start_date <= today_dt <= end_date):
-                        print(f"[DEBUG] 跳过: 不在日期范围内")
-                        continue
+                    # 确保不超过今天
+                    if end_date > today_dt:
+                        end_date = today_dt
                     
-                    should_execute = False
-                    if plan.frequency == 'daily':
-                        should_execute = True
-                    elif plan.frequency == 'weekly':
-                        should_execute = (today_dt.weekday() == start_date.weekday())
-                    elif plan.frequency == 'monthly':
-                        should_execute = (today_dt.day == start_date.day)
+                    print(f"[DEBUG] 计划日期范围: {plan.start_date} ~ {end_date.strftime('%Y-%m-%d')}")
                     
-                    print(f"[DEBUG] 是否应执行: {should_execute}")
+                    # 生成所有应该定投的日期
+                    plan_dates = []
+                    current_date = start_date
                     
-                    if should_execute:
-                        # Calculate T+1 confirm date (next weekday)
-                        confirm_dt = today_dt + timedelta(days=1)
-                        while confirm_dt.weekday() >= 5:
-                            confirm_dt += timedelta(days=1)
-                        confirm_date = confirm_dt.strftime('%Y-%m-%d')
+                    while current_date <= end_date:
+                        # 使用交易日检查器判断是否为交易日(跳过周末和节假日)
+                        if trade_checker.is_trading_day(current_date):
+                            plan_dates.append(current_date)
                         
-                        # Check if transaction already exists
+                        # 根据频率递增
+                        if plan.frequency == 'daily':
+                            current_date += timedelta(days=1)
+                        elif plan.frequency == 'weekly':
+                            current_date += timedelta(weeks=1)
+                        elif plan.frequency == 'monthly':
+                            current_date += relativedelta(months=1)
+                        elif plan.frequency == 'quarterly':
+                            current_date += relativedelta(months=3)
+                        else:
+                            break
+                    
+                    print(f"[DEBUG] 生成了 {len(plan_dates)} 个潜在定投日期")
+                    
+                    # 检查每个日期是否已存在交易记录
+                    for trans_date in plan_dates:
+                        trans_date_str = trans_date.strftime('%Y-%m-%d')
+                        
+                        # 检查是否已存在
                         result = session.execute(
                             text("""
                                 SELECT COUNT(*) FROM transactions
                                 WHERE user_id = :user_id AND fund_code = :fund_code AND transaction_date = :trans_date
                             """),
-                            {"user_id": service.user_id, "fund_code": plan.fund_code, "trans_date": today}
+                            {"user_id": service.user_id, "fund_code": plan.fund_code, "trans_date": trans_date_str}
                         )
                         
                         exists = result.scalar()
-                        print(f"[DEBUG] 交易记录已存在: {exists > 0}")
                         
                         if exists == 0:
-                            print(f"[DEBUG] 插入交易记录: {plan.fund_code}, 金额: {plan.amount}")
+                            # 计算T+1确认日期(下一个交易日)
+                            confirm_date = trade_checker.get_next_trading_day(trans_date, 1).strftime('%Y-%m-%d')
+                            
                             session.execute(
                                 text("""
                                     INSERT INTO transactions (
@@ -217,7 +235,7 @@ async def execute_today_plans(
                                     "user_id": service.user_id,
                                     "fund_code": plan.fund_code,
                                     "fund_name": plan.fund_name,
-                                    "trans_date": today,
+                                    "trans_date": trans_date_str,
                                     "nav_date": confirm_date,
                                     "trans_type": "买入",
                                     "target_amount": plan.amount,
@@ -225,13 +243,15 @@ async def execute_today_plans(
                                 }
                             )
                             transactions_created += 1
-                            print(f"[DEBUG] 成功创建交易记录")
+                        else:
+                            skipped_count += 1
         
-        print(f"[DEBUG] 提交事务,共创建 {transactions_created} 条记录")
+        print(f"\n[DEBUG] 执行完成: 新建 {transactions_created} 条, 跳过 {skipped_count} 条")
         
         return {
-            "message": f"成功创建 {transactions_created} 条定投交易记录",
+            "message": f"定投计划执行完成: 新建 {transactions_created} 条记录, 跳过已存在 {skipped_count} 条",
             "transactions_created": transactions_created,
+            "skipped": skipped_count,
             "date": today
         }
         

@@ -293,8 +293,14 @@ class PendingTransactionUpdater:
                     continue
                 target_amount = self.plans[fund_code]
             
-            # 获取净值日净值
-            nav_info = self._get_nav_for_date(fund_code, nav_date)
+            # 使用交易日(trans_date)的净值,而不是确认日(nav_date)
+            # 如果交易日是非交易日,则使用下一个交易日的净值
+            nav_info = self._get_nav_for_date(fund_code, trans_date)
+            
+            # 如果交易日没有净值,尝试使用确认日净值(向后兼容)
+            if not nav_info and nav_date != trans_date:
+                print(f"交易日 {trans_date} 无净值,尝试使用确认日 {nav_date}")
+                nav_info = self._get_nav_for_date(fund_code, nav_date)
             
             if not nav_info:
                 print(f"净值仍未抓取，跳过\n")
@@ -302,6 +308,9 @@ class PendingTransactionUpdater:
                 continue
             
             fund_name, unit_nav = nav_info
+            # 确俟target_amount和unit_nav都是float类型
+            target_amount = float(target_amount)
+            unit_nav = float(unit_nav)
             shares = round(target_amount / unit_nav, 2)
             amount = round(shares * unit_nav, 2)
             
