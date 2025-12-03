@@ -89,45 +89,61 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('表单提交开始')
     setError('')
 
     // 验证邮箱格式
+    console.log('验证邮箱:', formData.email)
     if (!validateEmail(formData.email)) {
+      console.error('邮箱格式无效')
       setError('请输入有效的邮箱地址')
       setValidationErrors(prev => ({ ...prev, email: '请输入有效的邮箱地址' }))
       return
     }
+    console.log('邮箱格式有效')
 
     // 验证密码强度
+    console.log('验证密码强度')
     const passwordValidation = validatePassword(formData.password)
+    console.log('密码验证结果:', passwordValidation)
     if (!passwordValidation.valid) {
+      console.error('密码不符合要求:', passwordValidation.message)
       setError(passwordValidation.message || '密码不符合要求')
       setValidationErrors(prev => ({ ...prev, password: passwordValidation.message }))
       return
     }
+    console.log('密码强度符合要求')
 
     // 验证两次密码是否一致
+    console.log('验证密码确认')
     if (formData.password !== formData.confirmPassword) {
+      console.error('两次密码不一致')
       setError('两次输入的密码不一致')
       setValidationErrors(prev => ({ ...prev, confirmPassword: '两次输入的密码不一致' }))
       return
     }
+    console.log('密码确认一致')
 
     // 检查是否有任何验证错误
+    console.log('检查验证错误:', validationErrors)
     if (validationErrors.email || validationErrors.password || validationErrors.confirmPassword) {
+      console.error('存在验证错误')
       setError('请修正表单中的错误后再提交')
       return
     }
-
+    console.log('所有验证通过')
     setLoading(true)
+    console.log('开始调用注册 API...')
     try {
       await register({
         email: formData.email,
         username: formData.username,
         password: formData.password
       })
+      console.log('注册成功')
       navigate('/dashboard')
     } catch (err: any) {
+      console.error('注册失败:', err)
       setError(err.response?.data?.detail || '注册失败，请稍后重试')
     } finally {
       setLoading(false)
