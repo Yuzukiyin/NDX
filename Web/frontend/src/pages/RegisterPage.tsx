@@ -15,14 +15,107 @@ export default function RegisterPage() {
     confirmPassword: ''
   })
   const [error, setError] = useState('')
+  const [validationErrors, setValidationErrors] = useState<{
+    email?: string
+    password?: string
+    confirmPassword?: string
+  }>({})
   const [loading, setLoading] = useState(false)
+
+  // 邮箱格式验证
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  // 密码强度验证
+  const validatePassword = (password: string): { valid: boolean; message?: string } => {
+    if (password.length < 8) {
+      return { valid: false, message: '密码至少需要 8 个字符' }
+    }
+    if (!/[A-Z]/.test(password)) {
+      return { valid: false, message: '密码必须包含至少一个大写字母' }
+    }
+    if (!/[a-z]/.test(password)) {
+      return { valid: false, message: '密码必须包含至少一个小写字母' }
+    }
+    if (!/[0-9]/.test(password)) {
+      return { valid: false, message: '密码必须包含至少一个数字' }
+    }
+    return { valid: true }
+  }
+
+  // 实时验证邮箱
+  const handleEmailChange = (email: string) => {
+    setFormData({ ...formData, email })
+    if (email && !validateEmail(email)) {
+      setValidationErrors(prev => ({ ...prev, email: '请输入有效的邮箱地址' }))
+    } else {
+      setValidationErrors(prev => ({ ...prev, email: undefined }))
+    }
+  }
+
+  // 实时验证密码
+  const handlePasswordChange = (password: string) => {
+    setFormData({ ...formData, password })
+    if (password) {
+      const validation = validatePassword(password)
+      if (!validation.valid) {
+        setValidationErrors(prev => ({ ...prev, password: validation.message }))
+      } else {
+        setValidationErrors(prev => ({ ...prev, password: undefined }))
+      }
+    } else {
+      setValidationErrors(prev => ({ ...prev, password: undefined }))
+    }
+    
+    // 同时检查确认密码
+    if (formData.confirmPassword && password !== formData.confirmPassword) {
+      setValidationErrors(prev => ({ ...prev, confirmPassword: '两次输入的密码不一致' }))
+    } else {
+      setValidationErrors(prev => ({ ...prev, confirmPassword: undefined }))
+    }
+  }
+
+  // 验证确认密码
+  const handleConfirmPasswordChange = (confirmPassword: string) => {
+    setFormData({ ...formData, confirmPassword })
+    if (confirmPassword && confirmPassword !== formData.password) {
+      setValidationErrors(prev => ({ ...prev, confirmPassword: '两次输入的密码不一致' }))
+    } else {
+      setValidationErrors(prev => ({ ...prev, confirmPassword: undefined }))
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
+    // 验证邮箱格式
+    if (!validateEmail(formData.email)) {
+      setError('请输入有效的邮箱地址')
+      setValidationErrors(prev => ({ ...prev, email: '请输入有效的邮箱地址' }))
+      return
+    }
+
+    // 验证密码强度
+    const passwordValidation = validatePassword(formData.password)
+    if (!passwordValidation.valid) {
+      setError(passwordValidation.message || '密码不符合要求')
+      setValidationErrors(prev => ({ ...prev, password: passwordValidation.message }))
+      return
+    }
+
+    // 验证两次密码是否一致
     if (formData.password !== formData.confirmPassword) {
       setError('两次输入的密码不一致')
+      setValidationErrors(prev => ({ ...prev, confirmPassword: '两次输入的密码不一致' }))
+      return
+    }
+
+    // 检查是否有任何验证错误
+    if (validationErrors.email || validationErrors.password || validationErrors.confirmPassword) {
+      setError('请修正表单中的错误后再提交')
       return
     }
 
@@ -97,12 +190,25 @@ export default function RegisterPage() {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full pl-10 sm:pl-12 pr-4 sm:pr-5 py-3 sm:py-4 bg-white/10 border border-white/20 rounded-xl sm:rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:border-white/40 focus:bg-white/15 transition-all duration-300 text-sm sm:text-base"
+                  onChange={(e) => handleEmailChange(e.target.value)}
+                  className={`w-full pl-10 sm:pl-12 pr-4 sm:pr-5 py-3 sm:py-4 bg-white/10 border rounded-xl sm:rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:bg-white/15 transition-all duration-300 text-sm sm:text-base ${
+                    validationErrors.email 
+                      ? 'border-red-500/60 focus:border-red-500/80' 
+                      : 'border-white/20 focus:border-white/40'
+                  }`}
                   placeholder="your@email.com"
                   required
                 />
               </div>
+              {validationErrors.email && (
+                <motion.p
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-xs text-red-300 flex items-center gap-1"
+                >
+                  <span className="text-red-400">⚠</span> {validationErrors.email}
+                </motion.p>
+              )}
             </div>
 
             {/* Username Input */}
@@ -138,13 +244,58 @@ export default function RegisterPage() {
                 <input
                   type="password"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full pl-10 sm:pl-12 pr-4 sm:pr-5 py-3 sm:py-4 bg-white/10 border border-white/20 rounded-xl sm:rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:border-white/40 focus:bg-white/15 transition-all duration-300 text-sm sm:text-base"
-                  placeholder="至少8个字符"
+                  onChange={(e) => handlePasswordChange(e.target.value)}
+                  className={`w-full pl-10 sm:pl-12 pr-4 sm:pr-5 py-3 sm:py-4 bg-white/10 border rounded-xl sm:rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:bg-white/15 transition-all duration-300 text-sm sm:text-base ${
+                    validationErrors.password 
+                      ? 'border-red-500/60 focus:border-red-500/80' 
+                      : 'border-white/20 focus:border-white/40'
+                  }`}
+                  placeholder="至少8个字符，含大小写字母和数字"
                   required
                   minLength={8}
                 />
               </div>
+              {validationErrors.password && (
+                <motion.p
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-xs text-red-300 flex items-center gap-1"
+                >
+                  <span className="text-red-400">⚠</span> {validationErrors.password}
+                </motion.p>
+              )}
+              {!validationErrors.password && formData.password && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-xs text-gray-300 space-y-1"
+                >
+                  <p className="flex items-center gap-1.5">
+                    <span className={formData.password.length >= 8 ? 'text-green-400' : 'text-gray-500'}>
+                      {formData.password.length >= 8 ? '✓' : '○'}
+                    </span>
+                    至少 8 个字符
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <span className={/[A-Z]/.test(formData.password) ? 'text-green-400' : 'text-gray-500'}>
+                      {/[A-Z]/.test(formData.password) ? '✓' : '○'}
+                    </span>
+                    包含大写字母
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <span className={/[a-z]/.test(formData.password) ? 'text-green-400' : 'text-gray-500'}>
+                      {/[a-z]/.test(formData.password) ? '✓' : '○'}
+                    </span>
+                    包含小写字母
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <span className={/[0-9]/.test(formData.password) ? 'text-green-400' : 'text-gray-500'}>
+                      {/[0-9]/.test(formData.password) ? '✓' : '○'}
+                    </span>
+                    包含数字
+                  </p>
+                </motion.div>
+              )}
             </div>
 
             {/* Confirm Password Input */}
@@ -159,12 +310,34 @@ export default function RegisterPage() {
                 <input
                   type="password"
                   value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  className="w-full pl-10 sm:pl-12 pr-4 sm:pr-5 py-3 sm:py-4 bg-white/10 border border-white/20 rounded-xl sm:rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:border-white/40 focus:bg-white/15 transition-all duration-300 text-sm sm:text-base"
+                  onChange={(e) => handleConfirmPasswordChange(e.target.value)}
+                  className={`w-full pl-10 sm:pl-12 pr-4 sm:pr-5 py-3 sm:py-4 bg-white/10 border rounded-xl sm:rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:bg-white/15 transition-all duration-300 text-sm sm:text-base ${
+                    validationErrors.confirmPassword 
+                      ? 'border-red-500/60 focus:border-red-500/80' 
+                      : 'border-white/20 focus:border-white/40'
+                  }`}
                   placeholder="再次输入密码"
                   required
                 />
               </div>
+              {validationErrors.confirmPassword && (
+                <motion.p
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-xs text-red-300 flex items-center gap-1"
+                >
+                  <span className="text-red-400">⚠</span> {validationErrors.confirmPassword}
+                </motion.p>
+              )}
+              {!validationErrors.confirmPassword && formData.confirmPassword && formData.password === formData.confirmPassword && (
+                <motion.p
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-xs text-green-300 flex items-center gap-1"
+                >
+                  <span className="text-green-400">✓</span> 密码匹配
+                </motion.p>
+              )}
             </div>
 
             {/* Submit Button */}
