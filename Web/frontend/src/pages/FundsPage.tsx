@@ -13,17 +13,17 @@ export default function FundsPage() {
 
   return (
     <Layout>
-      <div className="space-y-10">
+      <div className="space-y-6 sm:space-y-8 lg:space-y-10">
         {/* Page Header */}
-        <div className="flex items-end justify-between border-b border-gray-200 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between border-b border-gray-200 pb-4 sm:pb-6 gap-3">
           <div>
-            <h1 className="text-5xl font-black text-gray-900 tracking-tight mb-3">基金</h1>
-            <p className="text-gray-500 text-lg">管理您的基金持仓</p>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900 tracking-tight mb-2 sm:mb-3">基金</h1>
+            <p className="text-gray-500 text-base sm:text-lg">管理您的基金持仓</p>
           </div>
         </div>
 
         {/* Funds Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
           {funds.map((fund, index) => {
             const isProfit = fund.profit >= 0
 
@@ -38,23 +38,23 @@ export default function FundsPage() {
                   ease: [0.16, 1, 0.3, 1],
                 }}
                 whileHover={{ y: -8, scale: 1.02, transition: { duration: 0.3 } }}
-                className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 border border-gray-200/60 shadow-lg hover:shadow-2xl transition-all duration-300 group"
+                className="bg-white/80 backdrop-blur-sm rounded-2xl sm:rounded-3xl p-5 sm:p-6 lg:p-8 border border-gray-200/60 shadow-lg hover:shadow-2xl transition-all duration-300 group"
               >
                 {/* Fund Header */}
-                <div className="mb-6">
-                  <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="mb-5 sm:mb-6">
+                  <div className="flex items-start justify-between gap-3 sm:gap-4 mb-4">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 text-xl mb-2 truncate tracking-tight">
+                      <h3 className="font-bold text-gray-900 text-lg sm:text-xl mb-2 truncate tracking-tight">
                         {fund.fund_name}
                       </h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <Hash className="w-4 h-4" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
+                        <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span className="font-mono">{fund.fund_code}</span>
                       </div>
                     </div>
                     <div className={`
-                      px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap
-                      flex items-center gap-1.5
+                      px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap
+                      flex items-center gap-1.5 flex-shrink-0
                       group-hover:scale-110 transition-transform duration-300
                       ${isProfit
                         ? 'bg-green-100 text-green-700'
@@ -62,9 +62,9 @@ export default function FundsPage() {
                       }
                     `}>
                       {isProfit ? (
-                        <TrendingUp className="w-4 h-4" />
+                        <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       ) : (
-                        <TrendingDown className="w-4 h-4" />
+                        <TrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       )}
                       {fund.profit_rate.toFixed(2)}%
                     </div>
@@ -72,11 +72,11 @@ export default function FundsPage() {
                 </div>
 
                 {/* Main Stats */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl p-5 border border-blue-200/50">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-5 sm:mb-6">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-blue-200/50">
                     <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="w-4 h-4 text-blue-600" />
-                      <p className="text-xs text-blue-700 font-bold uppercase tracking-wide">
+                      <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
+                      <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
                         当前市值
                       </p>
                     </div>

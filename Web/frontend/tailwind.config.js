@@ -6,6 +6,11 @@ export default {
   ],
   theme: {
     extend: {
+      screens: {
+        'xs': '475px',
+        '3xl': '1920px',
+        '4xl': '2560px',
+      },
       colors: {
         border: "rgb(210, 210, 215)",
         success: "rgb(48, 209, 88)",

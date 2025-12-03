@@ -82,46 +82,108 @@ export default function TransactionsPage() {
 
   return (
     <Layout>
-      <div className="space-y-10">
+      <div className="space-y-6 sm:space-y-8 lg:space-y-10">
         {/* Page Header */}
-        <div className="flex items-end justify-between border-b border-gray-200 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between border-b border-gray-200 pb-4 sm:pb-6 gap-3">
           <div>
-            <h1 className="text-5xl font-black text-gray-900 tracking-tight mb-3">交易</h1>
-            <p className="text-gray-500 text-lg">记录和管理您的交易历史</p>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900 tracking-tight mb-2 sm:mb-3">交易</h1>
+            <p className="text-gray-500 text-base sm:text-lg">记录和管理您的交易历史</p>
           </div>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="px-6 py-3.5 bg-gray-900 text-white rounded-2xl font-bold text-sm flex items-center gap-2.5 hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl hover:scale-105 duration-300"
+            className="px-4 sm:px-6 py-3 sm:py-3.5 bg-gray-900 text-white rounded-xl sm:rounded-2xl font-bold text-sm flex items-center justify-center gap-2 sm:gap-2.5 hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl hover:scale-105 duration-300"
           >
-            <Plus className="w-5 h-5" />
-            添加交易
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">添加交易</span>
+            <span className="sm:hidden">添加</span>
           </button>
         </div>
 
         {/* Transactions Table */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-gray-200/60 shadow-lg overflow-hidden">
-          {/* Table Header */}
-          <div className="bg-gray-50 px-8 py-5 border-b border-gray-200">
-            <div className="grid grid-cols-7 gap-6 text-sm font-bold text-gray-700 uppercase tracking-wide">
-              <div
-                className="flex items-center gap-2 cursor-pointer hover:text-gray-900 transition-colors"
-                onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
-              >
-                <Calendar className="w-4 h-4" />
-                日期
-                <ArrowUpDown className="w-4 h-4" />
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl sm:rounded-3xl border border-gray-200/60 shadow-lg overflow-hidden">
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            {/* Table Header */}
+            <div className="bg-gray-50 px-6 lg:px-8 py-4 lg:py-5 border-b border-gray-200">
+              <div className="grid grid-cols-7 gap-4 lg:gap-6 text-xs sm:text-sm font-bold text-gray-700 uppercase tracking-wide">
+                <div
+                  className="flex items-center gap-2 cursor-pointer hover:text-gray-900 transition-colors"
+                  onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                >
+                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  日期
+                  <ArrowUpDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </div>
+                <div>基金代码</div>
+                <div>基金名称</div>
+                <div>类型</div>
+                <div className="text-right">份额</div>
+                <div className="text-right">净值</div>
+                <div className="text-right">金额</div>
               </div>
-              <div>基金代码</div>
-              <div>基金名称</div>
-              <div>类型</div>
-              <div className="text-right">份额</div>
-              <div className="text-right">净值</div>
-              <div className="text-right">金额</div>
+            </div>
+
+            {/* Table Body */}
+            <div className="divide-y divide-gray-100">
+              <AnimatePresence mode="popLayout">
+                {paginatedTransactions.map((transaction, index) => (
+                  <motion.div
+                    key={transaction.transaction_id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -30 }}
+                    transition={{
+                      duration: 0.4,
+                      delay: index * 0.03,
+                      ease: [0.16, 1, 0.3, 1],
+                    }}
+                    className="grid grid-cols-7 gap-4 lg:gap-6 px-6 lg:px-8 py-4 lg:py-5 hover:bg-gray-50/70 transition-colors group"
+                  >
+                    <div className="text-xs sm:text-sm font-medium text-gray-900">
+                      {new Date(transaction.transaction_date).toLocaleDateString('zh-CN')}
+                    </div>
+                    <div className="text-xs sm:text-sm font-mono text-gray-700 font-semibold">
+                      {transaction.fund_code}
+                    </div>
+                    <div className="text-xs sm:text-sm text-gray-900 font-medium truncate">
+                      {transaction.fund_name}
+                    </div>
+                    <div>
+                      <span
+                        className={`
+                          inline-flex px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-bold uppercase tracking-wide
+                          ${transaction.transaction_type === '买入'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-orange-100 text-orange-700'
+                          }
+                        `}
+                      >
+                        {transaction.transaction_type === '买入' ? '买入' : '卖出'}
+                      </span>
+                    </div>
+                    <div className="text-xs sm:text-sm text-right font-bold text-gray-900">
+                      {transaction.shares?.toFixed(2) || '-'}
+                    </div>
+                    <div className="text-xs sm:text-sm text-right text-gray-700 font-medium">
+                      ¥{transaction.unit_nav?.toFixed(4) || '-'}
+                    </div>
+                    <div className="text-xs sm:text-sm text-right font-bold text-gray-900 flex items-center justify-end gap-3">
+                      ¥{transaction.amount.toFixed(2)}
+                      <button
+                        onClick={() => handleDelete(transaction.transaction_id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-50 rounded-lg"
+                      >
+                        <X className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
 
-          {/* Table Body */}
-          <div className="divide-y divide-gray-100">
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-gray-100">
             <AnimatePresence mode="popLayout">
               {paginatedTransactions.map((transaction, index) => (
                 <motion.div
@@ -134,44 +196,55 @@ export default function TransactionsPage() {
                     delay: index * 0.03,
                     ease: [0.16, 1, 0.3, 1],
                   }}
-                  className="grid grid-cols-7 gap-6 px-8 py-5 hover:bg-gray-50/70 transition-colors group"
+                  className="p-4 hover:bg-gray-50/70 transition-colors"
                 >
-                  <div className="text-sm font-medium text-gray-900">
-                    {new Date(transaction.transaction_date).toLocaleDateString('zh-CN')}
-                  </div>
-                  <div className="text-sm font-mono text-gray-700 font-semibold">
-                    {transaction.fund_code}
-                  </div>
-                  <div className="text-sm text-gray-900 font-medium truncate">
-                    {transaction.fund_name}
-                  </div>
-                  <div>
-                    <span
-                      className={`
-                        inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide
-                        ${transaction.transaction_type === '买入'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-orange-100 text-orange-700'
-                        }
-                      `}
-                    >
-                      {transaction.transaction_type === '买入' ? '买入' : '卖出'}
-                    </span>
-                  </div>
-                  <div className="text-sm text-right font-bold text-gray-900">
-                    {transaction.shares?.toFixed(2) || '-'}
-                  </div>
-                  <div className="text-sm text-right text-gray-700 font-medium">
-                    ¥{transaction.unit_nav?.toFixed(4) || '-'}
-                  </div>
-                  <div className="text-sm text-right font-bold text-gray-900 flex items-center justify-end gap-3">
-                    ¥{transaction.amount.toFixed(2)}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-900 text-sm mb-1 truncate">
+                        {transaction.fund_name}
+                      </h3>
+                      <p className="text-xs text-gray-500 font-mono">{transaction.fund_code}</p>
+                    </div>
                     <button
                       onClick={() => handleDelete(transaction.transaction_id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-50 rounded-lg"
+                      className="p-1.5 hover:bg-red-50 rounded-lg flex-shrink-0"
                     >
                       <X className="w-4 h-4 text-red-600" />
                     </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-xs text-gray-500">日期</span>
+                      <p className="font-medium text-gray-900">
+                        {new Date(transaction.transaction_date).toLocaleDateString('zh-CN')}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-gray-500">类型</span>
+                      <p>
+                        <span
+                          className={`
+                            inline-flex px-2.5 py-1 rounded-full text-xs font-bold
+                            ${transaction.transaction_type === '买入'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-orange-100 text-orange-700'
+                            }
+                          `}
+                        >
+                          {transaction.transaction_type}
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">金额</span>
+                      <p className="font-bold text-gray-900">¥{transaction.amount.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-gray-500">份额</span>
+                      <p className="font-medium text-gray-900">
+                        {transaction.shares?.toFixed(2) || '-'}
+                      </p>
+                    </div>
                   </div>
                 </motion.div>
               ))}
@@ -180,27 +253,27 @@ export default function TransactionsPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="px-8 py-5 border-t border-gray-200 flex items-center justify-between bg-gray-50/50">
-              <p className="text-sm text-gray-600 font-medium">
+            <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between bg-gray-50/50 gap-3 sm:gap-0">
+              <p className="text-xs sm:text-sm text-gray-600 font-medium">
                 共 {sortedTransactions.length} 条记录，第 {currentPage} / {totalPages} 页
               </p>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-xl font-semibold text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow"
+                  className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg sm:rounded-xl font-semibold text-xs sm:text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow"
                 >
-                  <ChevronLeft className="w-5 h-5" />
+                  <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
-                <span className="text-sm font-bold text-gray-900 min-w-[60px] text-center">
+                <span className="text-xs sm:text-sm font-bold text-gray-900 min-w-[50px] sm:min-w-[60px] text-center">
                   {currentPage} / {totalPages}
                 </span>
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-4 py-2 bg-white border border-gray-300 rounded-xl font-semibold text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow"
+                  className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg sm:rounded-xl font-semibold text-xs sm:text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow"
                 >
-                  <ChevronRight className="w-5 h-5" />
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </div>
             </div>
@@ -237,63 +310,63 @@ export default function TransactionsPage() {
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
             >
               <div 
-                className="bg-white/95 backdrop-blur-2xl rounded-3xl w-full max-w-lg p-10 shadow-2xl border border-gray-200" 
+                className="bg-white/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl w-full max-w-lg p-6 sm:p-8 lg:p-10 shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto" 
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-3xl font-black text-gray-900 tracking-tight">添加交易</h2>
+                <div className="flex items-center justify-between mb-6 sm:mb-8">
+                  <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">添加交易</h2>
                   <button
                     onClick={() => setIsAddModalOpen(false)}
                     className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
                   >
-                    <X className="w-6 h-6 text-gray-500" />
+                    <X className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500" />
                   </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2.5">基金代码</label>
+                      <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-2.5">基金代码</label>
                       <input
                         type="text"
                         required
                         value={formData.fund_code}
                         onChange={(e) => setFormData({ ...formData, fund_code: e.target.value })}
-                        className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
+                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3.5 bg-gray-50 border border-gray-300 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium text-sm sm:text-base"
                         placeholder="例如: 021000"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2.5">基金名称</label>
+                      <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-2.5">基金名称</label>
                       <input
                         type="text"
                         value={formData.fund_name}
                         onChange={(e) => setFormData({ ...formData, fund_name: e.target.value })}
-                        className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
+                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3.5 bg-gray-50 border border-gray-300 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium text-sm sm:text-base"
                         placeholder="可选"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2.5">交易日期</label>
+                      <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-2.5">交易日期</label>
                       <input
                         type="date"
                         required
                         value={formData.transaction_date}
                         onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })}
-                        className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
+                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3.5 bg-gray-50 border border-gray-300 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium text-sm sm:text-base"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2.5">交易类型</label>
+                      <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-2.5">交易类型</label>
                       <select
                         value={formData.transaction_type}
                         onChange={(e) => setFormData({ ...formData, transaction_type: e.target.value })}
-                        className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
+                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3.5 bg-gray-50 border border-gray-300 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium text-sm sm:text-base"
                       >
                         <option value="买入">买入</option>
                         <option value="卖出">卖出</option>
@@ -302,41 +375,41 @@ export default function TransactionsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2.5">金额 (元)</label>
+                    <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-2.5">金额 (元)</label>
                     <input
                       type="number"
                       step="0.01"
                       required
                       value={formData.amount}
                       onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3.5 bg-gray-50 border border-gray-300 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium text-sm sm:text-base"
                       placeholder="0.00"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2.5">备注</label>
+                    <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-2.5">备注</label>
                     <textarea
                       value={formData.note}
                       onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                      className="w-full px-4 py-3.5 bg-gray-50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3.5 bg-gray-50 border border-gray-300 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all text-gray-900 font-medium text-sm sm:text-base"
                       rows={3}
                       placeholder="可选备注信息"
                     />
                   </div>
 
-                  <div className="flex gap-4 pt-6">
+                  <div className="flex gap-3 sm:gap-4 pt-4 sm:pt-6">
                     <button
                       type="button"
                       onClick={() => setIsAddModalOpen(false)}
-                      className="flex-1 px-6 py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+                      className="flex-1 px-4 sm:px-6 py-3 sm:py-4 bg-gray-100 text-gray-700 rounded-xl sm:rounded-2xl font-bold hover:bg-gray-200 transition-all text-sm sm:text-base"
                     >
                       取消
                     </button>
                     <button 
                       type="submit" 
                       disabled={loading}
-                      className="flex-1 px-6 py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+                      className="flex-1 px-4 sm:px-6 py-3 sm:py-4 bg-gray-900 text-white rounded-xl sm:rounded-2xl font-bold hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 text-sm sm:text-base"
                     >
                       {loading ? '提交中...' : '提交'}
                     </button>

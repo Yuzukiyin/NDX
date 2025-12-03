@@ -114,3 +114,230 @@
     box-shadow: 0 20px 25px rgba(0, 0, 0, 0.07), 0 8px 10px rgba(0, 0, 0, 0.04);
   }
 }
+
+/* 响应式设计优化 */
+/* 超大屏幕 (2560px+) */
+@media (min-width: 2560px) {
+  .container {
+    max-width: 2000px;
+  }
+}
+
+/* 大屏幕 (1440px - 2559px) */
+@media (min-width: 1440px) and (max-width: 2559px) {
+  .container {
+    max-width: 1400px;
+  }
+}
+
+/* 中等屏幕调整 (1024px以下) */
+@media (max-width: 1024px) {
+  /* 调整主容器内边距 */
+  main {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* 小屏幕调整 (768px以下) */
+@media (max-width: 768px) {
+  /* 导航栏优化 */
+  nav {
+    height: 4rem;
+  }
+
+  /* 主容器优化 */
+  main {
+    padding: 1rem;
+  }
+
+  /* 标题尺寸调整 */
+  h1 {
+    font-size: 2rem !important;
+  }
+
+  h2 {
+    font-size: 1.5rem !important;
+  }
+
+  /* 卡片优化 */
+  .card-minimal,
+  .card-glass {
+    padding: 1rem;
+  }
+
+  /* 按钮优化 */
+  .btn-primary,
+  .btn-secondary {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.875rem;
+  }
+
+  /* 网格布局调整 */
+  .grid {
+    gap: 1rem;
+  }
+}
+
+/* 超小屏幕调整 (480px以下) */
+@media (max-width: 480px) {
+  /* 导航栏紧凑 */
+  nav {
+    height: 3.5rem;
+  }
+
+  /* Logo字体缩小 */
+  nav a[href="/dashboard"] {
+    font-size: 1.5rem;
+  }
+
+  /* 主容器超紧凑 */
+  main {
+    padding: 0.75rem;
+  }
+
+  /* 标题更小 */
+  h1 {
+    font-size: 1.75rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  h2 {
+    font-size: 1.25rem !important;
+  }
+
+  /* 文字大小调整 */
+  p,
+  span,
+  div {
+    font-size: 0.875rem;
+  }
+
+  /* 按钮更紧凑 */
+  .btn-primary,
+  .btn-secondary {
+    padding: 0.625rem 1rem;
+    font-size: 0.8125rem;
+  }
+
+  /* 卡片更紧凑 */
+  .card-minimal,
+  .card-glass {
+    padding: 0.75rem;
+    border-radius: 1rem;
+  }
+
+  /* 网格间距更小 */
+  .grid {
+    gap: 0.75rem;
+  }
+}
+
+/* 超超小屏幕 (360px以下) */
+@media (max-width: 360px) {
+  /* 导航栏最小化 */
+  nav {
+    height: 3rem;
+  }
+
+  nav a[href="/dashboard"] {
+    font-size: 1.25rem;
+  }
+
+  /* 主容器最小化 */
+  main {
+    padding: 0.5rem;
+  }
+
+  /* 标题最小 */
+  h1 {
+    font-size: 1.5rem !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  h2 {
+    font-size: 1.125rem !important;
+  }
+
+  /* 文字最小 */
+  p,
+  span,
+  div {
+    font-size: 0.8125rem;
+  }
+
+  /* 按钮最小 */
+  .btn-primary,
+  .btn-secondary {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.75rem;
+  }
+
+  /* 卡片最小 */
+  .card-minimal,
+  .card-glass {
+    padding: 0.625rem;
+    border-radius: 0.875rem;
+  }
+
+  /* 网格间距最小 */
+  .grid {
+    gap: 0.5rem;
+  }
+}
+
+/* 触摸设备优化 - 移除悬停效果，增加点击反馈 */
+@media (hover: none) and (pointer: coarse) {
+  .hover-lift:hover {
+    transform: none;
+  }
+
+  .hover-lift:active {
+    transform: scale(0.98);
+  }
+
+  /* 按钮触摸反馈 */
+  .btn-primary:active,
+  .btn-secondary:active {
+    transform: scale(0.96);
+  }
+
+  /* 移除所有hover阴影效果 */
+  *:hover {
+    box-shadow: none !important;
+  }
+}
+
+/* 横屏优化 */
+@media (max-width: 768px) and (orientation: landscape) {
+  /* 导航栏在横屏时调整 */
+  nav {
+    height: 3rem;
+  }
+
+  /* 主容器减少垂直内边距 */
+  main {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+}
+
+/* 打印样式优化 */
+@media print {
+  /* 隐藏导航和交互元素 */
+  nav,
+  button {
+    display: none !important;
+  }
+
+  /* 移除背景和阴影 */
+  * {
+    background: white !important;
+    box-shadow: none !important;
+  }
+
+  /* 优化文字颜色 */
+  * {
+    color: black !important;
+  }
+}
